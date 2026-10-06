@@ -30,6 +30,7 @@ const lightboxCloseBtn      = document.getElementById('lightboxCloseBtn');
 const lightboxBackdrop      = document.getElementById('lightboxBackdrop');
 
 const soundToggleBtn     = document.getElementById('soundToggleBtn');
+const loveBlastBtn       = document.getElementById('loveBlastBtn');
 const clearChatBtn       = document.getElementById('clearChatBtn');
 const lockAppBtn         = document.getElementById('lockAppBtn');
 const pinOverlay         = document.getElementById('pinOverlay');
@@ -1826,6 +1827,21 @@ function setupEventListeners() {
       soundEnabled = !soundEnabled;
       localStorage.setItem('chat_typing_sound', soundEnabled);
       updateSoundUI();
+    });
+  }
+
+  // Quick Love Blast action
+  if (loveBlastBtn) {
+    const ROMANTIC_BURST_EMOJIS = ['💖', '💕', '❤️', '💋', '🥰', '🫶', '🌹', '✨', '💗', '🫦'];
+    loveBlastBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      markMessageInteraction();
+      const randomEmoji = ROMANTIC_BURST_EMOJIS[Math.floor(Math.random() * ROMANTIC_BURST_EMOJIS.length)];
+      sendFlyingEmojiBalloon(randomEmoji);
+      loveBlastBtn.style.transform = 'scale(1.2) rotate(-12deg)';
+      setTimeout(() => { loveBlastBtn.style.transform = ''; }, 250);
+      showToast('Love sent 💕', 'success');
+      keepInputFocused();
     });
   }
 

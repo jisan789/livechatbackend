@@ -3,86 +3,107 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-  <title>Live Chat - Jack King</title>
-  <meta name="description" content="Clean mobile chat application UI with free random avatar API integration.">
-  <link rel="stylesheet" href="static/style.css?v=4.9">
+  <title>LiveChat</title>
+  <meta name="description" content="Professional real-time chat application with authentic Apple liquid glassmorphism, live keystroke streaming, and secure passcode lock.">
+  <link rel="stylesheet" href="static/style.css?v=7.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=SF+Pro+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- Mobile Chat Application UI -->
+  <!-- Liquid Glass Optical Refraction SVG Filter Definition -->
+  <svg style="display:none;" aria-hidden="true">
+    <filter id="liquidGlassFilter">
+      <feTurbulence type="turbulence" baseFrequency="0.01" numOctaves="2" result="turbulence" />
+      <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="18" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <!-- Desktop Ambient Liquid Glass Wallpaper Lights -->
+  <div class="desktop-wallpaper-glow desktop-wallpaper-glow--1" aria-hidden="true"></div>
+  <div class="desktop-wallpaper-glow desktop-wallpaper-glow--2" aria-hidden="true"></div>
+  <div class="desktop-wallpaper-glow desktop-wallpaper-glow--3" aria-hidden="true"></div>
+
+  <!-- Main Liquid Glass Chat App Container -->
   <div class="chat-app" id="chatApp">
     
-    <!-- Subtle curved watermark vector background -->
+    <!-- Liquid Glass Specular Inner Rim Layer -->
+    <div class="liquid-glass-rim" aria-hidden="true"></div>
+
+    <!-- Background Subtle Prismatic Lines -->
     <div class="background-watermark" aria-hidden="true">
       <svg viewBox="0 0 400 800" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M-50 150 C 150 120, 300 350, 450 300" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="3 4"/>
-        <path d="M-80 400 C 100 480, 250 380, 480 620" stroke="#CBD5E1" stroke-width="1.2"/>
-        <path d="M-20 700 C 180 620, 220 780, 450 740" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="2 3"/>
-        <path d="M120 -50 C 200 200, 50 450, 220 850" stroke="#E2E8F0" stroke-width="1"/>
+        <path d="M-60 140 C 140 100, 260 300, 460 220" stroke="rgba(255, 255, 255, 0.45)" stroke-width="1.2" stroke-dasharray="4 6"/>
+        <path d="M-40 460 C 120 540, 280 390, 480 620" stroke="rgba(255, 255, 255, 0.35)" stroke-width="1.2"/>
+        <path d="M120 -60 C 200 190, 60 440, 250 860" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1"/>
       </svg>
     </div>
 
-    <!-- Chat Header Navigation with Live Opponent Typing Status -->
+    <!-- Apple Liquid Glass Header -->
     <header class="chat-header" aria-label="Conversation Header">
       <div class="header-left">
-        <!-- Avatar with Free API source (Click to close keyboard / get new random avatar) -->
+        <!-- Avatar with Specular Glass Ring -->
         <div class="avatar-wrapper" id="avatarWrapper" title="Click to close keyboard">
-          <img id="avatarImg" class="avatar-img" src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=256" alt="Jack King Avatar">
+          <img id="avatarImg" class="avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256" alt="User Avatar">
           <span class="avatar-badge" aria-label="Online"></span>
         </div>
 
-        <!-- Contact Info (Shows live typing status when opponent types) -->
+        <!-- User Info -->
         <div class="user-info">
-          <h1 class="user-name" id="userName">Jack king</h1>
+          <h1 class="user-name" id="userName">User</h1>
           <span class="user-status" id="userStatus">Online</span>
         </div>
       </div>
 
-      <!-- Header Actions: Sound, Clear Chat & Lock App -->
+      <!-- Header Actions: Sound, Clear Chat, Lock Screen & LiveDraw -->
       <div class="header-actions">
-        <!-- Tiny Unfocused External Link to LiveDraw -->
-        <a href="https://livedrawing.onrender.com/" target="_blank" rel="noopener noreferrer" class="tiny-external-btn" id="liveDrawingBtn" aria-label="Open LiveDraw" title="LiveDraw">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
-        </a>
-        <button class="action-icon-btn" id="soundToggleBtn" aria-label="Toggle opponent typing sound" title="Opponent typing sound enabled (Click to mute)">
+        <!-- Sound Toggle -->
+        <button class="action-icon-btn" id="soundToggleBtn" aria-label="Toggle typing sound" title="Typing sound enabled (Click to mute)">
           <!-- Sound ON Icon -->
-          <svg class="sound-on-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sound-on-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
           </svg>
           <!-- Sound OFF Icon -->
-          <svg class="sound-off-icon" style="display: none;" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sound-off-icon" style="display: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <line x1="23" y1="9" x2="17" y2="15"></line>
             <line x1="17" y1="9" x2="23" y2="15"></line>
           </svg>
         </button>
+
+        <!-- Clear Chat History -->
         <button class="action-icon-btn" id="clearChatBtn" aria-label="Clear Chat History" title="Clear Chat">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
         </button>
+
+        <!-- Lock App / Switch User -->
         <button class="action-icon-btn" id="lockAppBtn" aria-label="Lock App / Switch User" title="Lock App">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2.5" ry="2.5"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
         </button>
+
+        <!-- Subtle Link to LiveDraw -->
+        <a href="https://livedrawing.onrender.com/" target="_blank" rel="noopener noreferrer" class="tiny-external-btn" id="liveDrawingBtn" aria-label="Open LiveDraw" title="LiveDraw">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </a>
       </div>
     </header>
 
     <!-- Chat Messages Scroll Container -->
     <main class="chat-body" id="chatMessages" role="log" aria-live="polite">
       
-      <!-- Date Badge -->
+      <!-- Date Divider -->
       <div class="date-divider" id="chatDateDivider">Today</div>
 
       <!-- Live Typing Indicator for Opponent User -->
@@ -94,16 +115,16 @@
 
     </main>
 
-    <!-- Bottom Input Area -->
+    <!-- Bottom Liquid Glass Input Bar -->
     <footer class="chat-footer" id="chatFooter">
       <div class="input-container">
         
-        <!-- Input Pill -->
+        <!-- Liquid Glass Input Pill -->
         <div class="input-pill" id="inputPill">
           <div class="input-normal-content" id="inputNormalContent">
             <!-- Emoji Picker Trigger -->
-            <button class="input-icon-btn" id="emojiBtn" aria-label="Insert Emoji" type="button">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <button class="input-icon-btn" id="emojiBtn" aria-label="Insert Emoji" type="button" title="Insert Emoji">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
                 <line x1="9" y1="9" x2="9.01" y2="9"></line>
@@ -112,7 +133,7 @@
             </button>
 
             <!-- Input Text Field -->
-            <input type="text" id="chatInput" class="chat-input" placeholder="Enter Text" autocomplete="off" enterkeyhint="send">
+            <input type="text" id="chatInput" class="chat-input" placeholder="iMessage" autocomplete="off" enterkeyhint="send">
             <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
           </div>
 
@@ -148,12 +169,10 @@
       </div>
     </footer>
 
-
-
     <!-- Floating Balloon Emoji Reactions Overlay -->
     <div class="floating-balloons-container" id="floatingBalloonsContainer"></div>
 
-    <!-- Emoji Popover -->
+    <!-- Liquid Glass Emoji Popover -->
     <div class="emoji-popover" id="emojiPopover">
       <div class="emoji-popover-actions">
         <button class="emoji-popover-action-btn" id="emojiImageBtn" type="button" title="Send Photo">
@@ -162,36 +181,43 @@
             <circle cx="8.5" cy="8.5" r="1.5"></circle>
             <polyline points="21 15 16 10 5 21"></polyline>
           </svg>
-          <span>Send Photo</span>
+          <span>Share Photo</span>
         </button>
       </div>
       <div class="emoji-grid">
-        <button class="emoji-btn">👍</button>
-        <button class="emoji-btn">💖</button>
-        <button class="emoji-btn">❤️</button>
-        <button class="emoji-btn">💋</button>
-        <button class="emoji-btn">💗</button>
-        <button class="emoji-btn">😭</button>
-        <button class="emoji-btn">🫦</button>
-        <button class="emoji-btn">😂</button>
-        <button class="emoji-btn">🌚</button>
-        <button class="emoji-btn">🥵</button>
-        <button class="emoji-btn">👀</button>
-        <button class="emoji-btn">🫂</button>
+        <button class="emoji-btn" title="Thumbs Up">👍</button>
+        <button class="emoji-btn" title="Heart">❤️</button>
+        <button class="emoji-btn" title="Sparkles">✨</button>
+        <button class="emoji-btn" title="Fire">🔥</button>
+        <button class="emoji-btn" title="Laugh">😂</button>
+        <button class="emoji-btn" title="Smile">😊</button>
+        <button class="emoji-btn" title="Clap">👏</button>
+        <button class="emoji-btn" title="Cool">😎</button>
+        <button class="emoji-btn" title="Thinking">🤔</button>
+        <button class="emoji-btn" title="Surprised">😮</button>
+        <button class="emoji-btn" title="Eyes">👀</button>
+        <button class="emoji-btn" title="Hug">🫂</button>
+        <button class="emoji-btn" title="Tears of Joy">😭</button>
+        <button class="emoji-btn" title="Check">✅</button>
+        <button class="emoji-btn" title="Party">🎉</button>
+        <button class="emoji-btn" title="Rocket">🚀</button>
+        <button class="emoji-btn" title="Star">⭐</button>
+        <button class="emoji-btn" title="Coffee">☕</button>
       </div>
     </div>
 
-    <!-- Personal PIN Input Pad Overlay (Jisu: 1470 • Jenu: 3690) -->
+    <!-- Apple Passcode Lock Screen Overlay (Clean, Minimalist, No Names Mentioned) -->
     <div class="pin-overlay" id="pinOverlay">
       <div class="pin-card">
         <div class="pin-header">
           <div class="pin-lock-icon">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <rect x="3" y="11" width="18" height="11" rx="3" ry="3"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
           </div>
           <h2 class="pin-title">Enter Passcode</h2>
+          <p class="pin-subtitle">Enter your 4-digit passcode</p>
         </div>
 
         <!-- 4 PIN Dots Indicator -->
@@ -204,19 +230,47 @@
 
         <div class="pin-feedback" id="pinFeedback"></div>
 
-        <!-- Numeric Keypad -->
+        <!-- Apple Liquid Glass Numeric Keypad with Subtitles -->
         <div class="pin-keypad">
-          <button type="button" class="pin-key" data-digit="1">1</button>
-          <button type="button" class="pin-key" data-digit="2">2</button>
-          <button type="button" class="pin-key" data-digit="3">3</button>
-          <button type="button" class="pin-key" data-digit="4">4</button>
-          <button type="button" class="pin-key" data-digit="5">5</button>
-          <button type="button" class="pin-key" data-digit="6">6</button>
-          <button type="button" class="pin-key" data-digit="7">7</button>
-          <button type="button" class="pin-key" data-digit="8">8</button>
-          <button type="button" class="pin-key" data-digit="9">9</button>
+          <button type="button" class="pin-key" data-digit="1">
+            <span class="pin-num">1</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="2">
+            <span class="pin-num">2</span>
+            <span class="pin-letters">ABC</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="3">
+            <span class="pin-num">3</span>
+            <span class="pin-letters">DEF</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="4">
+            <span class="pin-num">4</span>
+            <span class="pin-letters">GHI</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="5">
+            <span class="pin-num">5</span>
+            <span class="pin-letters">JKL</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="6">
+            <span class="pin-num">6</span>
+            <span class="pin-letters">MNO</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="7">
+            <span class="pin-num">7</span>
+            <span class="pin-letters">PQRS</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="8">
+            <span class="pin-num">8</span>
+            <span class="pin-letters">TUV</span>
+          </button>
+          <button type="button" class="pin-key" data-digit="9">
+            <span class="pin-num">9</span>
+            <span class="pin-letters">WXYZ</span>
+          </button>
           <div class="pin-key-empty"></div>
-          <button type="button" class="pin-key" data-digit="0">0</button>
+          <button type="button" class="pin-key" data-digit="0">
+            <span class="pin-num">0</span>
+          </button>
           <button type="button" class="pin-key pin-back-key" id="pinBackspaceBtn" aria-label="Delete">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
@@ -244,6 +298,6 @@
     </div>
   </div>
 
-  <script src="static/app.js?v=4.7"></script>
+  <script src="static/app.js?v=7.0"></script>
 </body>
 </html>
