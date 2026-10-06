@@ -117,7 +117,6 @@ body {
   z-index: 5;
 }
 
-/* Liquid Glass Specular Inner Rim Layer (From Reference) */
 .liquid-glass-rim {
   content: '';
   position: absolute;
@@ -157,22 +156,23 @@ body {
 }
 
 /* ══════════════════════════════════════════════════
-   LIQUID GLASS HEADER
+   ICONIC APPLE LIQUID GLASS HEADER
    ══════════════════════════════════════════════════ */
 .chat-header {
   position: relative;
   z-index: 10;
-  padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 12px 18px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: brightness(1.06) blur(20px) saturate(180%);
-  -webkit-backdrop-filter: brightness(1.06) blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  backdrop-filter: brightness(1.12) blur(28px) saturate(190%);
+  -webkit-backdrop-filter: brightness(1.12) blur(28px) saturate(190%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 4px 16px -4px rgba(15, 23, 42, 0.04);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.4),
+    0 8px 30px -6px rgba(15, 23, 42, 0.07);
   flex-shrink: 0;
 }
 
@@ -182,12 +182,31 @@ body {
   gap: 12px;
 }
 
+/* Iconic Avatar with Glass Halo */
 .avatar-wrapper {
   position: relative;
   width: 44px;
   height: 44px;
   cursor: pointer;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-glass-halo {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(0, 122, 255, 0.3) 100%);
+  opacity: 0.85;
+  filter: blur(1px);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.avatar-wrapper:hover .avatar-glass-halo {
+  transform: scale(1.08);
+  opacity: 1;
 }
 
 .avatar-img {
@@ -197,127 +216,180 @@ body {
   object-fit: cover;
   background: #E2E8F0;
   display: block;
+  position: relative;
+  z-index: 2;
   box-shadow: 
-    inset 0 0 4px rgba(255, 255, 255, 0.6),
-    0 2px 10px rgba(15, 23, 42, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.95);
+    inset 0 0 4px rgba(255, 255, 255, 0.8),
+    0 4px 12px rgba(15, 23, 42, 0.12);
+  border: 2px solid #FFFFFF;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
 }
 
 .avatar-wrapper:hover .avatar-img {
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
 .avatar-wrapper:active .avatar-img {
-  transform: scale(0.94);
+  transform: scale(0.95);
 }
 
+/* Emerald Presence Indicator with Core */
 .avatar-badge {
   position: absolute;
-  bottom: 1px;
-  right: 1px;
-  width: 11px;
-  height: 11px;
-  background: #22C55E;
-  border: 2px solid #FFFFFF;
+  bottom: 0px;
+  right: 0px;
+  width: 13px;
+  height: 13px;
+  background: #10B981;
+  border: 2.2px solid #FFFFFF;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  z-index: 3;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
   animation: presencePulse 3s infinite ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.3s ease;
 }
 
+.avatar-badge-core {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  opacity: 0.85;
+}
+
 @keyframes presencePulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); }
-  50% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
 }
 
 .user-name {
+  font-family: 'Plus Jakarta Sans', 'SF Pro Display', sans-serif;
   font-size: 17.5px;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.25;
-  letter-spacing: -0.35px;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+}
+
+/* User Status Capsule */
+.user-status-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 1.5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9);
+  width: fit-content;
+}
+
+.status-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
 }
 
 .user-status {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-secondary);
   line-height: 1.2;
   transition: color 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 160px;
 }
 
 .user-status.is-typing {
   color: #007AFF;
-  font-weight: 600;
-  transition: color 0.25s ease;
+  font-weight: 700;
 }
 
-/* Header Action Buttons */
-.header-actions {
+/* ══════════════════════════════════════════════════
+   SEGMENTED LIQUID GLASS HEADER ACTION CAPSULE
+   ══════════════════════════════════════════════════ */
+.header-actions-capsule {
   display: flex;
   align-items: center;
-  gap: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: brightness(1.08) blur(18px) saturate(180%);
+  -webkit-backdrop-filter: brightness(1.08) blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 3px 4px;
+  gap: 2px;
+  box-shadow: 
+    inset 1.5px 1.5px 0 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 6px rgba(255, 255, 255, 0.4),
+    0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.header-action-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(148, 163, 184, 0.3);
+  margin: 0 1px;
 }
 
 .action-icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: brightness(1.05) blur(14px);
-  -webkit-backdrop-filter: brightness(1.05) blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #1E293B;
   cursor: pointer;
-  box-shadow: 
-    inset 1px 1px 0px 0px rgba(255, 255, 255, 0.8),
-    0 2px 8px rgba(15, 23, 42, 0.05);
+  box-shadow: inset 1px 1px 0px rgba(255, 255, 255, 0.9);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .action-icon-btn.muted {
   color: #94A3B8;
-  background: rgba(248, 250, 252, 0.7);
+  background: rgba(248, 250, 252, 0.5);
 }
 
 .action-icon-btn:hover {
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(255, 255, 255, 1);
   color: #007AFF;
-  transform: translateY(-1.5px);
+  transform: translateY(-1px) scale(1.05);
   box-shadow: 
-    inset 1px 1px 0px 0px rgba(255, 255, 255, 0.9),
-    0 4px 14px rgba(15, 23, 42, 0.1);
+    inset 1px 1px 0px rgba(255, 255, 255, 1),
+    0 3px 10px rgba(15, 23, 42, 0.08);
 }
 
 .action-icon-btn:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 
-/* Tiny External Link to LiveDraw */
+/* Tiny External Link */
 .tiny-external-btn,
 .tiny-external-btn:visited {
   width: 26px;
   height: 26px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.8);
   display: inline-flex;
   align-items: center;
@@ -327,7 +399,7 @@ body {
   opacity: 0.8;
   flex-shrink: 0;
   cursor: pointer;
-  box-shadow: inset 1px 1px 0px 0px rgba(255, 255, 255, 0.7);
+  box-shadow: inset 1px 1px 0px rgba(255, 255, 255, 0.8);
   transition: all 0.2s ease;
   outline: none;
   -webkit-tap-highlight-color: transparent;
@@ -345,16 +417,15 @@ body {
 }
 
 @media (max-width: 420px) {
-  .header-actions {
-    gap: 6px;
+  .chat-header {
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 10px 12px;
   }
   .action-icon-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
   }
-  .tiny-external-btn {
-    width: 24px;
-    height: 24px;
+  .header-actions-capsule {
+    padding: 2px 3px;
   }
 }
 
@@ -1496,7 +1567,7 @@ body {
   opacity: 1;
 }
 
-/* Apple Liquid Glass Numeric Keypad (Reference Double Inset Style) */
+/* Apple Liquid Glass Numeric Keypad */
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
