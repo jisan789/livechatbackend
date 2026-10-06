@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css?v=8.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=SF+Pro+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
         <div class="avatar-wrapper" id="avatarWrapper" title="Click to close keyboard">
           <div class="avatar-glass-halo" aria-hidden="true"></div>
           <img id="avatarImg" class="avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256" alt="User Avatar">
-          <span class="avatar-badge" aria-label="Online">
+          <span class="avatar-badge" id="avatarBadge" aria-label="Online Indicator">
             <span class="avatar-badge-core"></span>
           </span>
         </div>
@@ -56,8 +56,7 @@
         <div class="user-info">
           <h1 class="user-name" id="userName">User</h1>
           <div class="user-status-capsule">
-            <span class="status-live-dot"></span>
-            <span class="user-status" id="userStatus">Online</span>
+            <span class="user-status" id="userStatus">Connecting...</span>
           </div>
         </div>
       </div>

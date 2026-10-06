@@ -7,13 +7,14 @@ Deploy on Render — reads PORT env variable automatically.
 import os
 import json
 import asyncio
+import datetime
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from database import init_db, save_message, get_conversation, clear_messages, mark_messages_seen
+from database import init_db, save_message, get_conversation, clear_messages, mark_messages_seen, update_user_last_seen, get_user_last_seen
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("livechat")
@@ -115,15 +116,18 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
     logger.info(f"[+] {user_key} connected  (total: {len(connections)})")
 
     opponent = OPPONENTS[user_key]
+    is_opp_online = opponent in connections
+    opp_last_seen = get_user_last_seen(opponent) if not is_opp_online else None
 
     # Tell opponent this user is now online
     await notify_opponent(user_key, {"type": "presence", "status": "online", "user": user_key})
 
-    # Tell this user whether opponent is already online
+    # Tell this user whether opponent is already online & last seen
     await safe_send(websocket, {
         "type": "presence",
-        "status": "online" if opponent in connections else "offline",
-        "user": opponent
+        "status": "online" if is_opp_online else "offline",
+        "user": opponent,
+        "last_seen": opp_last_seen
     })
 
     try:
@@ -143,6 +147,8 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
             # 2. Persist chat, voice & image messages to PHP/DB in background task without blocking live chat.
             if msg_type in ("chat", "voice", "image"):
                 asyncio.create_task(background_save_message(user_key, opponent, msg_type, data))
+                now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+                asyncio.create_task(asyncio.to_thread(update_user_last_seen, user_key, now_iso))
 
             # 3. Persist seen status to PHP/DB in background task
             if msg_type in ("seen", "mark_seen"):
@@ -157,23 +163,55 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
         # If a new connection already replaced us, don't touch it.
         if connections.get(user_key) is websocket:
             connections.pop(user_key, None)
+            now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+            update_user_last_seen(user_key, now_iso)
             logger.info(f"[-] {user_key} disconnected (total: {len(connections)})")
-            await notify_opponent(user_key, {"type": "presence", "status": "offline", "user": user_key})
+            await notify_opponent(user_key, {
+                "type": "presence",
+                "status": "offline",
+                "user": user_key,
+                "last_seen": now_iso
+            })
         else:
             logger.info(f"[-] {user_key} stale connection closed (replaced by newer)")
 
 
 
 # ─────────────────────────────────────────────────────────────
-#  Message History Endpoint
+#  Message History & Presence Endpoints
 # ─────────────────────────────────────────────────────────────
+@app.get("/api/presence/{user_key}")
+async def api_get_presence(user_key: str):
+    if user_key not in VALID_USERS:
+        return JSONResponse({"status": "error", "message": "Unknown user"}, status_code=404)
+    opponent = OPPONENTS[user_key]
+    is_online = opponent in connections
+    last_seen = get_user_last_seen(opponent) if not is_online else None
+    return JSONResponse({
+        "status": "ok",
+        "user": user_key,
+        "opponent": opponent,
+        "is_online": is_online,
+        "last_seen": last_seen
+    })
+
+
 @app.get("/api/messages/{user_key}")
 async def get_messages(user_key: str):
     if user_key not in VALID_USERS:
         return JSONResponse({"status": "error", "message": "Unknown user"}, status_code=404)
     opponent = OPPONENTS[user_key]
     messages = get_conversation(user_key, opponent)
-    return JSONResponse({"status": "ok", "user": user_key, "opponent": opponent, "messages": messages})
+    is_online = opponent in connections
+    last_seen = get_user_last_seen(opponent) if not is_online else None
+    return JSONResponse({
+        "status": "ok",
+        "user": user_key,
+        "opponent": opponent,
+        "is_opponent_online": is_online,
+        "opponent_last_seen": last_seen,
+        "messages": messages
+    })
 
 
 @app.post("/api/messages/seen")

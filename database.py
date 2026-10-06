@@ -66,10 +66,62 @@ def init_db():
                     marked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_presence (
+                    user_key TEXT PRIMARY KEY,
+                    last_seen TEXT
+                );
+            """)
             conn.commit()
         logger.info("[DB] SQLite database initialized.")
     except Exception as e:
         logger.warning(f"[DB] SQLite init skipped or failed: {e}")
+
+
+def update_user_last_seen(user_key: str, last_seen_str: Optional[str] = None) -> bool:
+    """Record when a user was last active/seen."""
+    import datetime
+    if not user_key:
+        return False
+    if not last_seen_str:
+        last_seen_str = datetime.datetime.utcnow().isoformat() + "Z"
+    try:
+        with get_sqlite_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO user_presence (user_key, last_seen)
+                VALUES (?, ?)
+                ON CONFLICT(user_key) DO UPDATE SET last_seen = excluded.last_seen;
+                """,
+                (user_key, last_seen_str),
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"[DB] Error updating user last seen for {user_key}: {e}")
+        return False
+
+
+def get_user_last_seen(user_key: str) -> Optional[str]:
+    """Retrieve the last seen ISO timestamp for a user."""
+    if not user_key:
+        return None
+    try:
+        with get_sqlite_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT last_seen FROM user_presence WHERE user_key = ?", (user_key,))
+            row = cursor.fetchone()
+            if row and row["last_seen"]:
+                return row["last_seen"]
+            # Fallback: check most recent message sent by this user
+            cursor.execute("SELECT created_at FROM messages WHERE sender = ? ORDER BY id DESC LIMIT 1", (user_key,))
+            msg_row = cursor.fetchone()
+            if msg_row and msg_row["created_at"]:
+                return str(msg_row["created_at"])
+    except Exception as e:
+        logger.error(f"[DB] Error getting user last seen for {user_key}: {e}")
+    return None
 
 
 def save_message(

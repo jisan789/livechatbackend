@@ -69,6 +69,7 @@ let activeUser     = null;
 let currentPartner = { name: '', avatar: '', key: '' };
 let enteredPin     = '';
 let isOpponentOnline = false;
+let opponentLastSeen = null;
 
 // WebSocket state
 let ws              = null;
@@ -403,6 +404,15 @@ async function loadChatHistory(userKey) {
       scrollToBottom();
     }
 
+    // Sync opponent presence and last seen time from server payload
+    if (data.is_opponent_online !== undefined) {
+      isOpponentOnline = Boolean(data.is_opponent_online);
+      if (data.opponent_last_seen) {
+        opponentLastSeen = data.opponent_last_seen;
+      }
+      setPresenceUI(isOpponentOnline, opponentLastSeen);
+    }
+
     // Since the user is viewing chat history, mark all incoming messages seen
     if (hadIncoming) {
       acknowledgeAllSeen(userKey);
@@ -496,7 +506,10 @@ function handleWsMessage(msg) {
     case 'presence':
       if (msg.user === currentPartner.key) {
         isOpponentOnline = msg.status === 'online';
-        setPresenceUI(isOpponentOnline);
+        if (msg.last_seen) {
+          opponentLastSeen = msg.last_seen;
+        }
+        setPresenceUI(isOpponentOnline, opponentLastSeen);
       }
       break;
 
@@ -554,22 +567,95 @@ function handleWsMessage(msg) {
 }
 
 // ─────────────────────────────────────────────────
-//  Presence UI
+//  Presence UI & Last Seen Formatting
 // ─────────────────────────────────────────────────
-function setPresenceUI(online) {
-  if (avatarBadge) {
-    avatarBadge.style.background = online ? '#22C55E' : '#D1D5DB';
-  }
-  if (userStatusEl && !opponentTyping) {
-    userStatusEl.textContent = online ? 'Online' : 'Offline';
-    userStatusEl.classList.toggle('is-typing', false);
+function formatLastSeen(isoString) {
+  if (!isoString) return 'Offline';
+  try {
+    const cleanStr = isoString.includes('T') ? isoString : isoString.replace(' ', 'T') + 'Z';
+    const date = new Date(cleanStr);
+    if (isNaN(date.getTime())) return 'Offline';
+
+    const now = new Date();
+    const diffMs = Math.max(0, now.getTime() - date.getTime());
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+
+    // If within 45 seconds
+    if (diffSec < 45) {
+      return 'Last seen just now';
+    }
+
+    // Format local time (e.g. 10:45 PM)
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+    const timeStr = `${hours}:${strMinutes} ${ampm}`;
+
+    if (diffMin < 60) {
+      return `Last seen ${diffMin}m ago`;
+    }
+
+    const isToday = now.toDateString() === date.toDateString();
+    if (isToday) {
+      return `Last seen today at ${timeStr}`;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = yesterday.toDateString() === date.toDateString();
+    if (isYesterday) {
+      return `Last seen yesterday at ${timeStr}`;
+    }
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+
+    if (now.getFullYear() === date.getFullYear()) {
+      return `Last seen ${month} ${day} at ${timeStr}`;
+    }
+
+    return `Last seen ${month} ${day}, ${date.getFullYear()}`;
+  } catch (e) {
+    return 'Offline';
   }
 }
 
-function setPresenceOffline() {
-  isOpponentOnline = false;
-  setPresenceUI(false);
+function setPresenceUI(online, lastSeen = null) {
+  if (lastSeen !== null && lastSeen !== undefined) {
+    opponentLastSeen = lastSeen;
+  }
+  const badge = avatarBadge || document.getElementById('avatarBadge') || document.querySelector('.avatar-badge');
+  if (badge) {
+    badge.classList.toggle('is-online', Boolean(online));
+  }
+  if (userStatusEl && !opponentTyping) {
+    if (online) {
+      userStatusEl.textContent = 'Online';
+      userStatusEl.className = 'user-status is-online';
+    } else {
+      userStatusEl.textContent = formatLastSeen(opponentLastSeen);
+      userStatusEl.className = 'user-status is-offline';
+    }
+  }
 }
+
+function setPresenceOffline(lastSeen = null) {
+  isOpponentOnline = false;
+  if (lastSeen) opponentLastSeen = lastSeen;
+  setPresenceUI(false, opponentLastSeen);
+}
+
+// Keep relative last seen times updated automatically
+setInterval(() => {
+  if (activeUser && !isOpponentOnline && !opponentTyping && userStatusEl && opponentLastSeen) {
+    userStatusEl.textContent = formatLastSeen(opponentLastSeen);
+  }
+}, 25000);
 
 // ─────────────────────────────────────────────────
 //  Typing Indicators & Live Keystroke Sea-Wave Stream
@@ -732,13 +818,14 @@ function showOpponentTyping() {
 
 function hideOpponentTyping() {
   opponentTyping = false;
-  if (userStatusEl) {
-    userStatusEl.textContent = isOpponentOnline ? 'Online' : 'Offline';
-    userStatusEl.classList.remove('is-typing');
-  }
+  setPresenceUI(isOpponentOnline, opponentLastSeen);
   if (typingIndicator) {
     typingIndicator.classList.remove('active');
   }
+}
+
+function hideOpponentLivePreview() {
+  hideOpponentTyping();
 }
 
 function clearChatDOM() {
