@@ -399,6 +399,9 @@ button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 46px;
 }
 
 .message-row.outgoing + .message-row.incoming,

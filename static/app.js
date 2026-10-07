@@ -388,13 +388,13 @@ async function loadChatHistory(userKey) {
       }
 
       if (msg.msg_type === 'chat') {
-        appendMessage(msg.text_content, type, timeStr, msgIdStr, isSeen);
+        appendMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true);
         appendedAny = true;
       } else if (msg.msg_type === 'voice' && msg.text_content) {
-        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, msgIdStr, null, isSeen);
+        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, msgIdStr, null, isSeen, true);
         appendedAny = true;
       } else if (msg.msg_type === 'image' && msg.text_content) {
-        appendImageMessage(msg.text_content, type, timeStr, msgIdStr, isSeen);
+        appendImageMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true);
         appendedAny = true;
       }
       existingMsgIds.add(msgIdStr);
@@ -848,7 +848,7 @@ function handleSend() {
 // ─────────────────────────────────────────────────
 //  Append Message Bubble
 // ─────────────────────────────────────────────────
-function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeen = false) {
+function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -882,7 +882,9 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   messageRow.appendChild(timeEl);
 
   chatMessages.insertBefore(messageRow, typingIndicator);
-  scrollToBottom();
+  if (!skipScroll) {
+    scrollToBottom();
+  }
 }
 
 function scrollToBottom() {
@@ -1120,7 +1122,7 @@ const DEFAULT_SPEECH_WAVEFORM = [
 let currentlyPlayingVoiceAudio = null;
 let currentlyPlayingVoiceReset = null;
 
-function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeen = false) {
+function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeen = false, skipScroll = false) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -1178,7 +1180,9 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   attachDoubleTapReaction(bubble, messageRow);
 
   chatMessages.insertBefore(messageRow, typingIndicator);
-  scrollToBottom();
+  if (!skipScroll) {
+    scrollToBottom();
+  }
 
   const voiceBubble        = bubble.querySelector('.voice-bubble');
   const playBtn            = bubble.querySelector('.voice-play-btn');
@@ -1391,7 +1395,7 @@ async function handleSendImage(file) {
   }
 }
 
-function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeen = false) {
+function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -1441,7 +1445,9 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   messageRow.appendChild(timeEl);
 
   chatMessages.insertBefore(messageRow, typingIndicator);
-  scrollToBottom();
+  if (!skipScroll) {
+    scrollToBottom();
+  }
 }
 
 function receiveIncomingImage(imageUrl, timeStr, messageId = null) {
@@ -2311,12 +2317,35 @@ const fallbackAudio = SOUND_FILES.map((f) => {
   return a;
 });
 
-['click','keydown','touchstart','mousedown'].forEach(ev =>
-  window.addEventListener(ev, () => { getAudioContext(); preloadKeypressSounds(); }, { once: true, passive: true })
-);
+let lastLocalSoundPlayTime = 0;
+let lastOpponentSoundPlayTime = 0;
+let localAudioGainNode = null;
+let opponentAudioGainNode = null;
+
+function getLocalGainNode(ctx) {
+  if (!localAudioGainNode && ctx) {
+    localAudioGainNode = ctx.createGain();
+    localAudioGainNode.gain.value = 0.25;
+    localAudioGainNode.connect(ctx.destination);
+  }
+  return localAudioGainNode;
+}
+
+function getOpponentGainNode(ctx) {
+  if (!opponentAudioGainNode && ctx) {
+    opponentAudioGainNode = ctx.createGain();
+    opponentAudioGainNode.gain.value = 0.11;
+    opponentAudioGainNode.connect(ctx.destination);
+  }
+  return opponentAudioGainNode;
+}
 
 function playKeypressSound() {
   if (!soundEnabled) return;
+  const now = performance.now();
+  if (now - lastLocalSoundPlayTime < 32) return;
+  lastLocalSoundPlayTime = now;
+
   const ctx = getAudioContext();
   let idx = Math.floor(Math.random() * SOUND_FILES.length);
   if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
@@ -2324,19 +2353,17 @@ function playKeypressSound() {
 
   if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
     try {
-      const src  = ctx.createBufferSource();
-      const gain = ctx.createGain();
+      const src = ctx.createBufferSource();
+      const gain = getLocalGainNode(ctx);
       src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
-      // 50% volume for subtle and comfortable mechanical key clicks
-      gain.gain.value = 0.25 * (0.96 + Math.random() * 0.08);
       src.connect(gain);
-      gain.connect(ctx.destination);
       src.start(0);
     } catch (_) { /* ignore */ }
-  } else {
-    const clone = fallbackAudio[idx].cloneNode();
-    clone.volume = 0.25;
-    clone.play().catch(() => {});
+  } else if (fallbackAudio[idx]) {
+    try {
+      fallbackAudio[idx].currentTime = 0;
+      fallbackAudio[idx].play().catch(() => {});
+    } catch (_) {}
   }
 }
 
@@ -2344,6 +2371,10 @@ const playOpponentKeypressSound = playKeypressSound;
 
 function playOpponentLiveSound() {
   if (!soundEnabled) return;
+  const now = performance.now();
+  if (now - lastOpponentSoundPlayTime < 32) return;
+  lastOpponentSoundPlayTime = now;
+
   const ctx = getAudioContext();
   let idx = Math.floor(Math.random() * SOUND_FILES.length);
   if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
@@ -2351,19 +2382,17 @@ function playOpponentLiveSound() {
 
   if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
     try {
-      const src  = ctx.createBufferSource();
-      const gain = ctx.createGain();
+      const src = ctx.createBufferSource();
+      const gain = getOpponentGainNode(ctx);
       src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
-      // Ultra-gentle, peaceful whisper gain (0.11) for tranquil opponent typing ambiance
-      gain.gain.value = 0.11 * (0.95 + Math.random() * 0.1);
       src.connect(gain);
-      gain.connect(ctx.destination);
       src.start(0);
     } catch (_) { /* ignore */ }
-  } else if (fallbackAudio && fallbackAudio[idx]) {
-    const clone = fallbackAudio[idx].cloneNode();
-    clone.volume = 0.11;
-    clone.play().catch(() => {});
+  } else if (fallbackAudio[idx]) {
+    try {
+      fallbackAudio[idx].currentTime = 0;
+      fallbackAudio[idx].play().catch(() => {});
+    } catch (_) {}
   }
 }
 
