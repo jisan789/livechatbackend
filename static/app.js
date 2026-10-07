@@ -816,6 +816,7 @@ function receiveIncomingMessage(text, timeStr, messageId = null) {
     if (activeUser && currentPartner.key) {
       notifyMessageSeen(assignedId);
     }
+    triggerKeywordEmojiAnimations(text, false);
     return;
   }
 
@@ -824,6 +825,7 @@ function receiveIncomingMessage(text, timeStr, messageId = null) {
   if (activeUser && currentPartner.key) {
     notifyMessageSeen(assignedId);
   }
+  triggerKeywordEmojiAnimations(text, false);
 }
 
 // ─────────────────────────────────────────────────
@@ -854,6 +856,9 @@ function handleSend() {
 
   // Send the chat message (silently queued in background if offline)
   wsSend({ type: 'chat', text, time: clientTime, id: msgId }, true);
+
+  // Automatically trigger emoji balloon animation if couple keywords are present
+  triggerKeywordEmojiAnimations(text, true);
 }
 
 // ─────────────────────────────────────────────────
@@ -2308,6 +2313,81 @@ function getBalloonsContainer() {
     (chatApp || document.body).appendChild(container);
   }
   return container;
+}
+
+const EMOJI_KEYWORD_TRIGGERS = [
+  { emoji: '💋', keywords: ['chumu', 'chumma', 'kiss', 'muah', 'seduce', 'attraction'] },
+  { emoji: '🫦', keywords: ['thot', 'kamor', 'biting', 'nibble', 'tempting', 'desire'] },
+  { emoji: '😘', keywords: ['chumu', 'chumma', 'kiss', 'muah', 'romance', 'seduce'] },
+  { emoji: '🥰', keywords: ['bhalobasha', 'prem', 'valobashi', 'valobasi', 'bhalobasi', 'adore', 'intimacy', 'affection', 'love'] },
+  { emoji: '😍', keywords: ['sundor', 'shundor', 'mugdho', 'gorgeous', 'beautiful', 'attraction', 'desire'] },
+  { emoji: '❤️‍🔥', keywords: ['agun', 'prem', 'passion', 'desire', 'lust', 'intimacy'] },
+  { emoji: '🥵', keywords: ['gorom', 'hot', 'sexy', 'spicy', 'horny', 'aroused'] },
+  { emoji: '😏', keywords: ['dushtu', 'dushtumi', 'flirty', 'naughty', 'tease', 'suggestive'] },
+  { emoji: '🤤', keywords: ['lobh', 'khide', 'yummy', 'tasty', 'tempting', 'craving'] },
+  { emoji: '😉', keywords: ['ishara', 'wink', 'dushtu', 'hehe', 'flirt', 'tease'] },
+  { emoji: '👅', keywords: ['jib', 'vengchi', 'tease', 'lick', 'playful', 'naughty'] },
+  { emoji: '🔥', keywords: ['agun', 'joss', 'darun', 'fire', 'passion', 'desire'] },
+  { emoji: '❤️', keywords: ['bhalobasha', 'valobashi', 'valobasi', 'mon', 'prem', 'affection', 'intimacy'] },
+  { emoji: '💖', keywords: ['mishti', 'jhikimiki', 'maya', 'sparkle', 'affection', 'romance'] },
+  { emoji: '💕', keywords: ['dujon', 'juti', 'prem', 'couple', 'romance', 'intimacy'] },
+  { emoji: '💘', keywords: ['cupid', 'crush', 'prem', 'monchuri', 'attraction', 'desire'] },
+  { emoji: '💓', keywords: ['dhorfor', 'heartbeat', 'kapche', 'uttejona', 'excitement', 'passion'] },
+  { emoji: '🫂', keywords: ['joriye', 'hug', 'ador', 'cuddle', 'intimacy', 'closeness'] },
+  { emoji: '🌹', keywords: ['golap', 'ful', 'romance', 'seduction', 'attraction', 'desire', 'rose'] },
+  { emoji: '🍷', keywords: ['wine', 'cheers', 'drink', 'party', 'romance', 'date'] },
+  { emoji: '🍓', keywords: ['strawberry', 'strobari', 'fol', 'mishti', 'juicy', 'tempting'] },
+  { emoji: '🍫', keywords: ['chocolate', 'choklet', 'choco', 'mishti', 'sweet', 'craving'] },
+  { emoji: '🥺', keywords: ['please', 'plz', 'daya', 'maf', 'maaf', 'affection', 'needy'] },
+  { emoji: '✨', keywords: ['jhikimiki', 'jholmole', 'chokchoke', 'sparkle', 'magic', 'sensual'] }
+];
+
+function findTriggerEmojisForText(text) {
+  if (!text) return [];
+  const normalized = text.toLowerCase();
+  const matched = [];
+
+  for (const item of EMOJI_KEYWORD_TRIGGERS) {
+    for (const kw of item.keywords) {
+      const regex = new RegExp(`(^|[^a-zA-Z0-9])${kw}([^a-zA-Z0-9]|$)`, 'i');
+      if (regex.test(normalized)) {
+        if (!matched.includes(item.emoji)) {
+          matched.push(item.emoji);
+        }
+        break;
+      }
+    }
+  }
+  return matched;
+}
+
+let lastAutoTriggerTime = 0;
+
+function triggerKeywordEmojiAnimations(text, broadcast = true) {
+  const emojis = findTriggerEmojisForText(text);
+  if (emojis.length === 0) return;
+
+  const now = Date.now();
+  if (now - lastAutoTriggerTime < 800) return;
+  lastAutoTriggerTime = now;
+
+  emojis.slice(0, 2).forEach((emojiChar, idx) => {
+    setTimeout(() => {
+      // Animate corresponding emoji button in grid
+      const btn = document.querySelector(`.emoji-btn[data-emoji="${emojiChar}"]`) ||
+                  Array.from(document.querySelectorAll('.emoji-btn')).find(b => b.textContent.trim() === emojiChar);
+      if (btn) {
+        btn.classList.add('keyword-pulse');
+        setTimeout(() => btn.classList.remove('keyword-pulse'), 800);
+      }
+
+      if (broadcast) {
+        sendFlyingEmojiBalloon(emojiChar);
+      } else {
+        createFlyingBalloon(emojiChar);
+      }
+    }, idx * 350);
+  });
 }
 
 const COMPANION_EMOJIS = {
