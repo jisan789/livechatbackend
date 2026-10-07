@@ -2205,21 +2205,47 @@ function setupEventListeners() {
     });
   }
 
-  // Paste image directly from clipboard (Ctrl+V or mobile paste)
-  window.addEventListener('paste', (e) => {
-    if (e.clipboardData && e.clipboardData.items) {
-      for (const item of e.clipboardData.items) {
-        if (item.type && item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
+  // ── Clipboard Image Pasting (Ctrl+V / Paste Everywhere) ──
+  function handleClipboardPaste(e) {
+    const clipboard = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData) || window.clipboardData;
+    if (!clipboard) return;
+
+    // 1. Check direct clipboard files
+    if (clipboard.files && clipboard.files.length > 0) {
+      for (let i = 0; i < clipboard.files.length; i++) {
+        const file = clipboard.files[i];
+        if (file && file.type && file.type.startsWith('image/')) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSendImage(file);
+          keepInputFocused();
+          return;
+        }
+      }
+    }
+
+    // 2. Check items collection (supports Snipping Tool, screenshots, copied images)
+    if (clipboard.items && clipboard.items.length > 0) {
+      for (let i = 0; i < clipboard.items.length; i++) {
+        const item = clipboard.items[i];
+        if (item && (item.type.startsWith('image/') || item.kind === 'file')) {
+          const file = item.getAsFile ? item.getAsFile() : null;
+          if (file && file.type && file.type.startsWith('image/')) {
             e.preventDefault();
+            e.stopPropagation();
             handleSendImage(file);
-            break;
+            keepInputFocused();
+            return;
           }
         }
       }
     }
-  });
+  }
+
+  window.addEventListener('paste', handleClipboardPaste, true);
+  if (chatInput) {
+    chatInput.addEventListener('paste', handleClipboardPaste, true);
+  }
 
   // Lightbox close interactions
   if (lightboxCloseBtn) {
