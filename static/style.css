@@ -1287,7 +1287,7 @@ button, input, textarea, select {
 }
 
 /* ══════════════════════════════════════════════════
-   FLOATING BALLOON EMOJI REACTIONS
+   FLOATING BALLOON EMOJI REACTIONS (VIBRANT & ORGANIC)
    ══════════════════════════════════════════════════ */
 .floating-balloons-container {
   position: absolute;
@@ -1299,46 +1299,177 @@ button, input, textarea, select {
 
 .flying-balloon {
   position: absolute;
-  bottom: 68px;
+  bottom: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   pointer-events: none;
   user-select: none;
-  animation: balloonFlyUp var(--fly-duration, 2.8s) ease-out forwards;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 4px 10px rgba(244, 63, 94, 0.35));
+}
+
+.flying-balloon.fly-wave-a {
+  animation: balloonFlyWaveA var(--fly-duration, 3.2s) cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.flying-balloon.fly-wave-b {
+  animation: balloonFlyWaveB var(--fly-duration, 3.4s) cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.flying-balloon.fly-spiral {
+  animation: balloonFlySpiral var(--fly-duration, 3.6s) ease-out forwards;
+}
+
+.flying-balloon.fly-burst {
+  animation: balloonFlyBurst var(--fly-duration, 3.1s) cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 
 .balloon-emoji {
-  font-size: var(--balloon-size, 34px);
+  font-size: var(--balloon-size, 36px);
   line-height: 1;
   font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
   display: inline-block;
   transform-origin: center bottom;
+  animation: balloonWobble 1.8s ease-in-out infinite alternate;
 }
 
 .balloon-string {
   width: 1.5px;
-  height: 20px;
-  background: linear-gradient(to bottom, rgba(156, 163, 175, 0.75), rgba(156, 163, 175, 0.05));
+  height: 22px;
+  background: linear-gradient(to bottom, rgba(244, 63, 94, 0.85), rgba(244, 63, 94, 0.15) 75%, transparent);
   margin-top: -2px;
+  border-radius: 1px;
+  transform-origin: top center;
+  animation: stringSway 1.8s ease-in-out infinite alternate;
 }
 
-@keyframes balloonFlyUp {
+.balloon-sparkle {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.9;
+  animation: sparkleTwinkle 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes balloonWobble {
+  0% { transform: rotate(-5deg) scale(0.98); }
+  50% { transform: rotate(4deg) scale(1.03); }
+  100% { transform: rotate(-3deg) scale(1); }
+}
+
+@keyframes stringSway {
+  0% { transform: rotate(8deg); }
+  100% { transform: rotate(-8deg); }
+}
+
+@keyframes sparkleTwinkle {
+  0% { opacity: 0.3; transform: scale(0.7) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1.25) rotate(20deg); }
+}
+
+/* Trajectory Variants */
+@keyframes balloonFlyWaveA {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.5);
+    transform: translate(0, 16px) scale(0.4) rotate(0deg);
   }
-  15% {
+  12% {
     opacity: 1;
-    transform: translateY(-40px) scale(1.1);
+    transform: translate(var(--sway-1, 18px), -60px) scale(1.15) rotate(var(--rot-1, 10deg));
   }
-  80% {
+  35% {
+    transform: translate(var(--sway-2, -22px), -200px) scale(1.05) rotate(var(--rot-2, -8deg));
+  }
+  65% {
+    transform: translate(var(--sway-3, 14px), -420px) scale(0.98) rotate(var(--rot-3, 6deg));
+  }
+  90% {
     opacity: 0.9;
-    transform: translateY(-400px) scale(1);
+    transform: translate(var(--sway-4, -10px), -680px) scale(0.92) rotate(var(--rot-4, -4deg));
   }
   100% {
     opacity: 0;
-    transform: translateY(calc(-100vh - 40px)) scale(0.9);
+    transform: translate(var(--sway-4, -10px), calc(-100vh - 120px)) scale(0.85);
+  }
+}
+
+@keyframes balloonFlyWaveB {
+  0% {
+    opacity: 0;
+    transform: translate(0, 20px) scale(0.35) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(var(--sway-2, -24px), -50px) scale(1.18) rotate(var(--rot-2, -12deg));
+  }
+  40% {
+    transform: translate(var(--sway-1, 26px), -240px) scale(1.02) rotate(var(--rot-1, 9deg));
+  }
+  70% {
+    transform: translate(var(--sway-4, -16px), -480px) scale(0.95) rotate(var(--rot-4, -6deg));
+  }
+  92% {
+    opacity: 0.9;
+    transform: translate(var(--sway-3, 12px), -740px) scale(0.9) rotate(var(--rot-3, 4deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway-3, 12px), calc(-100vh - 120px)) scale(0.8);
+  }
+}
+
+@keyframes balloonFlySpiral {
+  0% {
+    opacity: 0;
+    transform: translate(0, 10px) scale(0.4) rotate(-15deg);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(var(--sway-1, 15px), -70px) scale(1.1) rotate(12deg);
+  }
+  30% {
+    transform: translate(var(--sway-2, -18px), -170px) scale(1.02) rotate(-10deg);
+  }
+  50% {
+    transform: translate(var(--sway-3, 20px), -320px) scale(1) rotate(10deg);
+  }
+  75% {
+    transform: translate(var(--sway-4, -15px), -530px) scale(0.95) rotate(-6deg);
+  }
+  90% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway-1, 8px), calc(-100vh - 120px)) scale(0.85) rotate(4deg);
+  }
+}
+
+@keyframes balloonFlyBurst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 24px) scale(0.2);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(var(--sway-1, 12px), -120px) scale(1.3) rotate(var(--rot-1, 14deg));
+  }
+  28% {
+    transform: translate(var(--sway-2, -14px), -160px) scale(0.96) rotate(var(--rot-2, -8deg));
+  }
+  55% {
+    transform: translate(var(--sway-3, 16px), -360px) scale(1.04) rotate(var(--rot-3, 7deg));
+  }
+  85% {
+    opacity: 0.9;
+    transform: translate(var(--sway-4, -8px), -600px) scale(0.92) rotate(var(--rot-4, -3deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway-4, -8px), calc(-100vh - 120px)) scale(0.8);
   }
 }
 

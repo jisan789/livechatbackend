@@ -2310,33 +2310,88 @@ function getBalloonsContainer() {
   return container;
 }
 
+const COMPANION_EMOJIS = {
+  '💋': ['🫦', '❤️‍🔥', '😘', '✨', '💕', '🥰'],
+  '🫦': ['💋', '🥵', '❤️‍🔥', '😏', '✨', '😍'],
+  '❤️‍🔥': ['🔥', '💋', '❤️', '🥵', '✨', '💖'],
+  '🥵': ['🫦', '🔥', '❤️‍🔥', '😏', '🤤', '💋'],
+  '😘': ['💋', '🥰', '😍', '💕', '✨', '💘'],
+  '🥰': ['😍', '😘', '💖', '💕', '✨', '🌹'],
+  '😍': ['🥰', '❤️‍🔥', '💖', '💘', '💋', '✨'],
+  '😏': ['🫦', '🥵', '😉', '👅', '✨', '🔥'],
+  '🤤': ['🥵', '🫦', '💋', '😏', '❤️‍🔥', '✨'],
+  '😉': ['😏', '😘', '💋', '✨', '👅', '💖'],
+  '👅': ['😏', '🫦', '🥵', '🔥', '💋', '✨'],
+  '🔥': ['❤️‍🔥', '🥵', '💋', '🫦', '✨', '💖'],
+  '❤️': ['💖', '💕', '💘', '💓', '❤️‍🔥', '🌹'],
+  '💖': ['💕', '💓', '✨', '❤️', '💘', '🥰'],
+  '💕': ['💖', '❤️', '💘', '💓', '✨', '🥰'],
+  '💘': ['💖', '💕', '❤️', '💓', '✨', '😍'],
+  '💓': ['💖', '💕', '❤️', '💘', '✨', '🥰'],
+  '🫂': ['🥰', '❤️', '💖', '💕', '✨', '🥺'],
+  '🌹': ['❤️', '🍷', '🍫', '✨', '💖', '🥰'],
+  '🍷': ['🌹', '🍫', '🍓', '✨', '❤️', '💋'],
+  '🍓': ['🍫', '🍷', '💋', '🫦', '✨', '💖'],
+  '🍫': ['🍓', '🍷', '🌹', '✨', '💖', '🥰'],
+  '🥺': ['🥰', '🫂', '💖', '💕', '✨', '💓'],
+  '✨': ['💖', '💕', '❤️‍🔥', '🌹', '🥰', '💋']
+};
+
+const TRAJECTORY_STYLES = ['fly-wave-a', 'fly-wave-b', 'fly-spiral', 'fly-burst'];
+
 function createFlyingBalloon(emojiChar) {
   if (!emojiChar) return;
   const container = getBalloonsContainer();
 
-  // Release a buoyant cluster: 1 lead balloon + 2 companion balloons
-  const count = 3;
-  const baseLeft = 15 + Math.random() * 70; // 15% to 85% width
+  const companions = COMPANION_EMOJIS[emojiChar] || ['✨', '💖', '❤️‍🔥', '💕', '💋'];
+
+  // Release a lavish flock: 10-12 emojis with staggered fountain timing
+  const count = 10 + Math.floor(Math.random() * 3); // 10 to 12 emojis
+  const baseLeft = 18 + Math.random() * 64; // central launch area (18% - 82%)
 
   for (let i = 0; i < count; i++) {
+    const staggerDelay = i * (35 + Math.floor(Math.random() * 25)); // 35-60ms stagger
+
     setTimeout(() => {
       const balloon = document.createElement('div');
-      balloon.className = 'flying-balloon';
 
-      const isLead = (i === 0);
-      const size = isLead ? (36 + Math.floor(Math.random() * 8)) : (24 + Math.floor(Math.random() * 8));
-      const leftOffset = isLead ? 0 : (Math.random() * 34 - 17);
-      const leftPos = Math.max(8, Math.min(92, baseLeft + leftOffset));
+      // Random trajectory variant
+      const trajectoryStyle = TRAJECTORY_STYLES[Math.floor(Math.random() * TRAJECTORY_STYLES.length)];
+      balloon.className = `flying-balloon ${trajectoryStyle}`;
 
-      const duration = (2.6 + Math.random() * 0.8).toFixed(2);
-      const sway1 = (12 + Math.random() * 16) * (Math.random() > 0.5 ? 1 : -1);
-      const sway2 = -sway1 * (0.8 + Math.random() * 0.3);
-      const sway3 = (10 + Math.random() * 14) * (Math.random() > 0.5 ? 1 : -1);
-      const sway4 = -sway3 * (0.7 + Math.random() * 0.4);
-      const rot1 = (4 + Math.random() * 8) * (sway1 > 0 ? 1 : -1);
-      const rot2 = -rot1 * 0.8;
-      const rot3 = (3 + Math.random() * 6) * (sway3 > 0 ? 1 : -1);
-      const rot4 = -rot3;
+      const isLead = (i === 0 || i === 1);
+      const isMini = (i >= count - 3);
+
+      // Emoji selection: lead is always the chosen emoji, others mix companions & sparkles
+      let chosenChar = emojiChar;
+      if (!isLead && Math.random() > 0.42) {
+        chosenChar = companions[Math.floor(Math.random() * companions.length)];
+      }
+
+      // Sizing tier
+      let size;
+      if (isLead) {
+        size = 46 + Math.floor(Math.random() * 8); // 46-54px
+      } else if (isMini) {
+        size = 22 + Math.floor(Math.random() * 6); // 22-28px
+      } else {
+        size = 32 + Math.floor(Math.random() * 10); // 32-42px
+      }
+
+      // Wide, organic natural spread across the view
+      const spreadJitter = (Math.random() * 60 - 30) + (i % 2 === 0 ? 12 : -12);
+      const leftPos = Math.max(6, Math.min(94, baseLeft + spreadJitter));
+
+      const duration = (2.9 + Math.random() * 0.9).toFixed(2);
+      const sway1 = (16 + Math.random() * 22) * (Math.random() > 0.5 ? 1 : -1);
+      const sway2 = -sway1 * (0.8 + Math.random() * 0.4);
+      const sway3 = (14 + Math.random() * 18) * (Math.random() > 0.5 ? 1 : -1);
+      const sway4 = -sway3 * (0.7 + Math.random() * 0.5);
+
+      const rot1 = (6 + Math.random() * 12) * (sway1 > 0 ? 1 : -1);
+      const rot2 = -rot1 * 0.85;
+      const rot3 = (5 + Math.random() * 8) * (sway3 > 0 ? 1 : -1);
+      const rot4 = -rot3 * 0.7;
 
       balloon.style.left = `${leftPos}%`;
       balloon.style.setProperty('--fly-duration', `${duration}s`);
@@ -2350,8 +2405,12 @@ function createFlyingBalloon(emojiChar) {
       balloon.style.setProperty('--rot-3', `${rot3}deg`);
       balloon.style.setProperty('--rot-4', `${rot4}deg`);
 
+      const hasSparkleBadge = (isLead || Math.random() < 0.25);
+      const sparkleBadgeHtml = hasSparkleBadge ? `<span class="balloon-sparkle" aria-hidden="true">✨</span>` : '';
+
       balloon.innerHTML = `
-        <span class="balloon-emoji" aria-hidden="true">${emojiChar}</span>
+        <span class="balloon-emoji" aria-hidden="true">${chosenChar}</span>
+        ${sparkleBadgeHtml}
         <div class="balloon-string" aria-hidden="true"></div>
       `;
 
@@ -2361,17 +2420,17 @@ function createFlyingBalloon(emojiChar) {
 
       setTimeout(() => {
         if (balloon.parentNode) balloon.remove();
-      }, (parseFloat(duration) + 0.6) * 1000);
+      }, (parseFloat(duration) + 0.8) * 1000);
 
       container.appendChild(balloon);
-    }, i * 85);
+    }, staggerDelay);
   }
 }
 
 function sendFlyingEmojiBalloon(emojiChar) {
   if (!emojiChar) return;
   const now = Date.now();
-  if (now - lastEmojiTapTime < 50) return;
+  if (now - lastEmojiTapTime < 40) return;
   lastEmojiTapTime = now;
 
   // 1. Instantly trigger floating balloons on own chat inbox
@@ -2383,7 +2442,7 @@ function sendFlyingEmojiBalloon(emojiChar) {
     emoji: emojiChar
   });
 
-  // 4. Do NOT input emoji into chatInput, and preserve virtual keyboard focus
+  // 3. Keep virtual keyboard open and input focused
   keepInputFocused();
 }
 
