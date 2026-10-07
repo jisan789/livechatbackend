@@ -445,7 +445,16 @@ function connectWebSocket(userKey) {
   ws.onopen = () => {
     console.log('[WS] connected as', userKey);
     wsReconnectDelay = 1000; // reset backoff on success
-    showToast('Connected ✓', 'success');
+
+    // Silently flush offline queue in the background
+    if (offlineQueue.length > 0) {
+      const itemsToFlush = [...offlineQueue];
+      offlineQueue = [];
+      itemsToFlush.forEach(payload => {
+        wsSend(payload, true);
+      });
+    }
+
     loadChatHistory(userKey);
   };
 
@@ -488,10 +497,19 @@ function scheduleReconnect(userKey) {
   }, wsReconnectDelay);
 }
 
-function wsSend(payload) {
+let offlineQueue = [];
+
+function wsSend(payload, shouldQueue = false) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(payload));
-    return true;
+    try {
+      ws.send(JSON.stringify(payload));
+      return true;
+    } catch (e) {
+      console.warn('[WS] send failed:', e);
+    }
+  }
+  if (shouldQueue) {
+    offlineQueue.push(payload);
   }
   return false;
 }
@@ -834,9 +852,8 @@ function handleSend() {
   wsSend({ type: 'typing_stop' });
   clearTimeout(typingOutTimer);
 
-  // Send the chat message
-  const sent = wsSend({ type: 'chat', text, time: clientTime, id: msgId });
-  if (!sent) showToast('Saved — will sync when connected', 'info');
+  // Send the chat message (silently queued in background if offline)
+  wsSend({ type: 'chat', text, time: clientTime, id: msgId }, true);
 }
 
 // ─────────────────────────────────────────────────
@@ -1219,17 +1236,13 @@ async function handleSendImage(file) {
     // 1. Render in sender's own chat
     appendImageMessage(compressedDataUrl, 'outgoing', clientTime, msgId, false);
 
-    // 2. Broadcast via WebSocket (Zero Latency)
-    const sent = wsSend({
+    // 2. Broadcast via WebSocket (silently queued in background if offline)
+    wsSend({
       type: 'image',
       image: compressedDataUrl,
       time: clientTime,
       id: msgId
-    });
-
-    if (!sent) {
-      showToast('Saved — will sync when connected', 'info');
-    }
+    }, true);
   } catch (err) {
     console.error('[Image] Failed to process image:', err);
     showToast('Failed to send image', 'error');
@@ -1503,7 +1516,7 @@ async function startVoiceRecording() {
 
       appendVoiceMessage(base64Audio, finalDuration, 'outgoing', clientTime, voiceMsgId, waveformContour);
 
-      // Sent via live WebSocket & persisted to PHP/DB storage in background
+      // Sent via live WebSocket & persisted (silently queued in background if offline)
       wsSend({
         type: 'voice',
         audio: base64Audio,
@@ -1511,7 +1524,7 @@ async function startVoiceRecording() {
         waveform: waveformContour,
         time: clientTime,
         id: voiceMsgId
-      });
+      }, true);
     };
     reader.readAsDataURL(audioBlob);
   };
