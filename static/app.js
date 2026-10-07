@@ -558,11 +558,6 @@ function handleWsMessage(msg) {
     case 'mark_seen':
       markOutgoingMessagesSeen(msg.msg_id || msg.id, msg.ids, msg.all);
       break;
-
-    // ── Love React (Live show only, zero DB) ───────
-    case 'love_react':
-      handleRemoteLoveReact(msg.msgId, msg.action);
-      break;
   }
 }
 
@@ -798,10 +793,6 @@ function receiveIncomingMessage(text, timeStr, messageId = null) {
     currentLiveIncomingRow.appendChild(timeEl);
 
     currentLiveIncomingRow.dataset.msgId = assignedId;
-    if (bubble) {
-      attachDoubleTapReaction(bubble, currentLiveIncomingRow);
-    }
-
     currentLiveIncomingRow = null;
     scrollToBottom();
     if (activeUser && currentPartner.key) {
@@ -877,8 +868,6 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   const timeEl = document.createElement('div');
   timeEl.className = 'message-time';
   timeEl.textContent = timeStr || formatCurrentTime();
-
-  attachDoubleTapReaction(bubble, messageRow);
 
   bubbleGroup.appendChild(bubble);
   messageRow.appendChild(bubbleGroup);
@@ -962,203 +951,6 @@ function keepInputFocused() {
 }
 
 // ─────────────────────────────────────────────────
-//  Love Reaction by Double-Tap (Live only, zero DB)
-// ─────────────────────────────────────────────────
-function attachDoubleTapReaction(bubble, messageRow) {
-  if (!bubble || !messageRow) return;
-
-  let lastTapTime = 0;
-  let lastTapPos = { x: 0, y: 0 };
-  let lastReactTime = 0;
-
-  const handlePointerOrMouse = (e) => {
-    markMessageInteraction();
-    if (document.activeElement === chatInput) {
-      if (!e.target.closest('.voice-play-btn')) {
-        e.preventDefault();
-      }
-      keepInputFocused();
-    }
-  };
-
-  // 1. Prevent desktop & mobile focus loss on pointerdown / mousedown
-  bubble.addEventListener('pointerdown', handlePointerOrMouse);
-  bubble.addEventListener('mousedown', handlePointerOrMouse);
-
-  // 2. Double-tap detection without cancelling touchstart (passive: true)
-  function handleDoubleTapGesture(e, clientX, clientY) {
-    markMessageInteraction();
-    const now = Date.now();
-    if (now - lastReactTime < 450) return; // Debounce rapid multi-triggers
-
-    const timeDiff = now - lastTapTime;
-    const dist = Math.hypot(clientX - lastTapPos.x, clientY - lastTapPos.y);
-
-    if (timeDiff > 0 && timeDiff < 380 && dist < 45) {
-      lastTapTime = 0;
-      lastReactTime = now;
-
-      if (window.getSelection) {
-        window.getSelection().removeAllRanges();
-      }
-
-      keepInputFocused();
-      triggerLoveReact(messageRow, true);
-    } else {
-      lastTapTime = now;
-      lastTapPos = { x: clientX, y: clientY };
-    }
-  }
-
-  // Intercept on touchstart with passive: true so browser never cancels gesture
-  bubble.addEventListener('touchstart', (e) => {
-    if (e.target.closest('.voice-play-btn') || e.target.closest('.love-react-badge')) {
-      return;
-    }
-    markMessageInteraction();
-    if (document.activeElement === chatInput) {
-      keepInputFocused();
-    }
-    const touch = e.touches[0];
-    if (touch) {
-      handleDoubleTapGesture(e, touch.clientX, touch.clientY);
-    }
-  }, { passive: true });
-
-  // 3. Desktop dblclick handling
-  bubble.addEventListener('dblclick', (e) => {
-    if (e.target.closest('.voice-play-btn') || e.target.closest('.love-react-badge')) {
-      return;
-    }
-    markMessageInteraction();
-    e.preventDefault();
-    if (window.getSelection) {
-      window.getSelection().removeAllRanges();
-    }
-    keepInputFocused();
-    triggerLoveReact(messageRow, true);
-  });
-}
-
-function triggerLoveReact(messageRow, isLocal = true) {
-  if (!messageRow) return;
-  const bubble = messageRow.querySelector('.bubble');
-  if (!bubble) return;
-
-  const msgId = messageRow.dataset.msgId;
-
-  // Prevent double-tap gesture from toggling or leaving the timestamp visible
-  messageRow.dataset.justReacted = 'true';
-  messageRow.classList.remove('show-time');
-  setTimeout(() => {
-    if (messageRow) messageRow.dataset.justReacted = '';
-  }, 450);
-
-  // 1. Play bursting heart pop animation
-  createHeartPopBurst(bubble);
-
-  // 2. Add or keep the persistent love react badge
-  let badge = bubble.querySelector('.love-react-badge');
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.className = 'love-react-badge';
-    badge.innerHTML = '❤️';
-    badge.title = 'Click to remove reaction';
-    badge.setAttribute('aria-label', 'Love reaction');
-
-    const handleRemove = (e) => {
-      markMessageInteraction();
-      e.stopPropagation();
-      e.preventDefault();
-      removeLoveReact(messageRow, true);
-      keepInputFocused();
-    };
-    badge.addEventListener('pointerdown', (e) => {
-      markMessageInteraction();
-      e.preventDefault();
-      keepInputFocused();
-    });
-    badge.addEventListener('mousedown', (e) => {
-      markMessageInteraction();
-      e.preventDefault();
-      keepInputFocused();
-    });
-    badge.addEventListener('touchstart', (e) => {
-      markMessageInteraction();
-      keepInputFocused();
-    }, { passive: true });
-    badge.addEventListener('click', handleRemove);
-    badge.addEventListener('touchend', handleRemove);
-
-    bubble.classList.add('has-react');
-    bubble.appendChild(badge);
-  }
-
-  // Preserve focus so keyboard doesn't close on react
-  keepInputFocused();
-
-  // 3. Broadcast to opponent live over WebSocket
-  if (isLocal && msgId) {
-    wsSend({
-      type: 'love_react',
-      msgId: msgId,
-      action: 'add'
-    });
-  }
-}
-
-function removeLoveReact(messageRow, isLocal = true) {
-  if (!messageRow) return;
-  const bubble = messageRow.querySelector('.bubble');
-  if (!bubble) return;
-
-  const badge = bubble.querySelector('.love-react-badge');
-  if (badge) {
-    badge.remove();
-  }
-  bubble.classList.remove('has-react');
-
-  const msgId = messageRow.dataset.msgId;
-  if (isLocal && msgId) {
-    wsSend({
-      type: 'love_react',
-      msgId: msgId,
-      action: 'remove'
-    });
-  }
-}
-
-function createHeartPopBurst(bubble) {
-  if (!bubble) return;
-  const prev = bubble.querySelector('.heart-pop-burst');
-  if (prev) prev.remove();
-
-  const burst = document.createElement('span');
-  burst.className = 'heart-pop-burst';
-  burst.textContent = '❤️';
-  bubble.appendChild(burst);
-
-  burst.addEventListener('animationend', () => {
-    burst.remove();
-  });
-  setTimeout(() => {
-    if (burst.parentNode) burst.remove();
-  }, 750);
-}
-
-function handleRemoteLoveReact(msgId, action) {
-  if (!msgId) return;
-  const row = document.querySelector(`#chatMessages .message-row[data-msg-id="${msgId}"]`);
-  if (!row) return;
-
-  if (action === 'remove') {
-    removeLoveReact(row, false);
-  } else {
-    triggerLoveReact(row, false);
-  }
-}
-
-// ─────────────────────────────────────────────────
 //  Voice Messaging (Live WebSocket & Real Audio)
 // ─────────────────────────────────────────────────
 const MIC_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>`;
@@ -1227,8 +1019,6 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   bubbleGroup.appendChild(bubble);
   messageRow.appendChild(bubbleGroup);
   messageRow.appendChild(timeEl);
-
-  attachDoubleTapReaction(bubble, messageRow);
 
   chatMessages.insertBefore(messageRow, typingIndicator);
   if (!skipScroll) {
@@ -1494,8 +1284,6 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   const timeEl = document.createElement('div');
   timeEl.className = 'message-time';
   timeEl.textContent = timeStr || formatCurrentTime();
-
-  attachDoubleTapReaction(bubble, messageRow);
 
   bubbleGroup.appendChild(bubble);
   messageRow.appendChild(bubbleGroup);
@@ -2188,17 +1976,10 @@ function setupEventListeners() {
         return;
       }
 
-      // Ignore clicks on specific interactive controls (voice play/seek, love react badge, photo preview)
+      // Ignore clicks on specific interactive controls (voice play/seek, photo preview)
       if (e.target.closest('.voice-play-btn') || 
           e.target.closest('.voice-waveform') || 
-          e.target.closest('.love-react-badge') ||
           e.target.closest('.chat-image-preview')) {
-        return;
-      }
-
-      // If user recently double-tapped to react, ignore this click
-      if (row.dataset.justReacted === 'true') {
-        row.dataset.justReacted = '';
         return;
       }
 
