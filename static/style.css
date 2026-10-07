@@ -103,7 +103,6 @@ button, input, textarea, select {
     0 20px 48px -12px rgba(15, 23, 42, 0.18),
     0 0 0 1px rgba(255, 255, 255, 0.85);
   z-index: 5;
-  contain: layout style paint;
 }
 
 .liquid-glass-rim {
@@ -349,9 +348,10 @@ button, input, textarea, select {
   position: relative;
   z-index: 5;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 12px 16px 14px 16px;
+  padding: 12px 16px 20px 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -360,9 +360,17 @@ button, input, textarea, select {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: auto; /* Instant snappy scroll */
+  scroll-padding-bottom: 24px;
   user-select: none;
   -webkit-user-select: none;
-  contain: layout style;
+}
+
+.chat-bottom-anchor {
+  height: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .chat-body::-webkit-scrollbar {
@@ -399,9 +407,6 @@ button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
-  contain: layout style;
-  content-visibility: auto;
-  contain-intrinsic-size: 0 46px;
 }
 
 .message-row.outgoing + .message-row.incoming,

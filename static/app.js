@@ -835,6 +835,9 @@ function handleSend() {
   // Retain focus so virtual keyboard does not close
   keepInputFocused();
 
+  // Ensure scroll is pinned to bottom after sending
+  scrollToBottom();
+
   // Clear live typing preview on opponent's screen
   wsSend({ type: 'live_typing', text: '' });
   wsSend({ type: 'typing_stop' });
@@ -887,10 +890,58 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   }
 }
 
-function scrollToBottom() {
-  if (chatMessages) {
+function scrollToBottom(forceInstant = false) {
+  if (!chatMessages) return;
+
+  const performScroll = () => {
+    // 1. Direct scroll to max scroll position
     chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
+
+    // 2. Anchor scroll into view to guarantee visibility above footer
+    const bottomAnchor = document.getElementById('chatBottomAnchor');
+    if (bottomAnchor && typeof bottomAnchor.scrollIntoView === 'function') {
+      try {
+        bottomAnchor.scrollIntoView({
+          behavior: forceInstant ? 'instant' : 'auto',
+          block: 'end',
+          inline: 'nearest'
+        });
+        return;
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    // 3. Fallback to scrolling the last message row into view
+    const messageRows = chatMessages.querySelectorAll('.message-row');
+    if (messageRows.length > 0) {
+      const lastRow = messageRows[messageRows.length - 1];
+      if (lastRow && typeof lastRow.scrollIntoView === 'function') {
+        try {
+          lastRow.scrollIntoView({
+            behavior: forceInstant ? 'instant' : 'auto',
+            block: 'end',
+            inline: 'nearest'
+          });
+        } catch (e) {
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      }
+    }
+  };
+
+  // Immediate synchronous scroll
+  performScroll();
+
+  // Re-scroll on next animation frame after layout/repaint
+  requestAnimationFrame(() => {
+    performScroll();
+  });
+
+  // Timed passes for virtual keyboards, dynamic font rendering, and reflow
+  setTimeout(performScroll, 30);
+  setTimeout(performScroll, 100);
+  setTimeout(performScroll, 250);
 }
 
 // ─────────────────────────────────────────────────
@@ -1419,6 +1470,12 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   img.alt = 'Shared photo';
   img.loading = 'lazy';
 
+  img.onload = () => {
+    if (!skipScroll) {
+      scrollToBottom();
+    }
+  };
+
   img.addEventListener('click', (e) => {
     e.stopPropagation();
     openImageLightbox(imageUrl);
@@ -1907,7 +1964,12 @@ function setupEventListeners() {
     if (chatInput.value.trim()) {
       handleSend();
       chatInput.focus({ preventScroll: true });
-      setTimeout(() => { chatInput.focus({ preventScroll: true }); }, 10);
+      scrollToBottom();
+      setTimeout(() => { 
+        chatInput.focus({ preventScroll: true }); 
+        scrollToBottom();
+      }, 10);
+      setTimeout(scrollToBottom, 60);
     }
   }
 
