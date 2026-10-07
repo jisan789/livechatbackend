@@ -1703,7 +1703,7 @@ function setupEventListeners() {
 
   // Quick Love Blast action
   if (loveBlastBtn) {
-    const ROMANTIC_BURST_EMOJIS = ['💖', '💕', '❤️', '💋', '🥰', '🫶', '🌹', '✨', '💗', '🫦'];
+    const ROMANTIC_BURST_EMOJIS = ['💋', '🫦', '❤️‍🔥', '🥵', '😘', '🥰', '😍', '🌹', '💖', '💘', '😏', '💕', '🍓', '🫂'];
     loveBlastBtn.addEventListener('click', (e) => {
       e.preventDefault();
       markMessageInteraction();
@@ -1711,7 +1711,7 @@ function setupEventListeners() {
       sendFlyingEmojiBalloon(randomEmoji);
       loveBlastBtn.style.transform = 'scale(1.2) rotate(-12deg)';
       setTimeout(() => { loveBlastBtn.style.transform = ''; }, 250);
-      showToast('Love sent 💕', 'success');
+      showToast('Love sent ❤️‍🔥', 'success');
       keepInputFocused();
     });
   }
