@@ -50,22 +50,25 @@ def get_click_url() -> str:
     return last_known_origin or "https://livechat.onrender.com"
 
 
-def send_ntfy_push(topic: str, title: str, message: str, click_url: str = "", priority: str = "high", tags: str = "bell") -> bool:
-    """Send push notification to ntfy.sh"""
+def send_ntfy_push(topic: str, title: str, message: str, click_url: str = "", priority: int = 5, tags: list = None) -> bool:
+    """Send push notification to ntfy.sh via clean JSON payload."""
     try:
-        url = f"https://ntfy.sh/{topic}"
-        headers = {
-            "Title": title.encode("utf-8"),
-            "Priority": priority,
-            "Tags": tags,
+        url = "https://ntfy.sh"
+        payload = {
+            "topic": topic,
+            "title": title,
+            "message": message,
+            "priority": priority,
+            "tags": tags or ["bell", "phone"],
         }
         if click_url:
-            headers["Click"] = click_url
+            payload["click"] = click_url
 
+        json_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(
             url,
-            data=message.encode("utf-8"),
-            headers=headers,
+            data=json_bytes,
+            headers={"Content-Type": "application/json; charset=utf-8"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=6) as response:
@@ -83,32 +86,32 @@ async def async_dispatch_push(recipient: str, sender: str, action_type: str, pre
     click_url = get_click_url()
 
     if action_type == "wake_up":
-        title = f"LiveChat — {sender_name} is calling you!"
+        title = f"LiveChat: {sender_name} is calling you!"
         message = f"{sender_name} wants you to come online now! Tap to open. 💬"
-        priority = "urgent"  # Max priority in ntfy: triggers ringtone, vibration & screen wakeup
-        tags = "bell,phone,zap"
+        priority = 5  # Max priority in ntfy: triggers phone ringtone & vibration
+        tags = ["bell", "phone", "zap"]
     elif action_type == "chat":
-        title = f"💬 New message from {sender_name}"
+        title = f"LiveChat: Message from {sender_name}"
         snip = preview.strip()[:100] if preview else "Sent a new message"
         message = snip
-        priority = "high"
-        tags = "speech_balloon"
+        priority = 4
+        tags = ["speech_balloon", "chat"]
     elif action_type == "voice":
-        title = f"🎙️ Voice note from {sender_name}"
+        title = f"LiveChat: Voice note from {sender_name}"
         dur = f" ({preview})" if preview else ""
         message = f"{sender_name} sent a voice message{dur}"
-        priority = "high"
-        tags = "microphone"
+        priority = 4
+        tags = ["microphone"]
     elif action_type == "image":
-        title = f"📷 Photo from {sender_name}"
+        title = f"LiveChat: Photo from {sender_name}"
         message = f"{sender_name} sent a photo"
-        priority = "high"
-        tags = "camera"
+        priority = 4
+        tags = ["camera"]
     else:
-        title = f"LiveChat — Alert from {sender_name}"
+        title = f"LiveChat: Alert from {sender_name}"
         message = f"{sender_name} sent you an alert."
-        priority = "high"
-        tags = "bell"
+        priority = 4
+        tags = ["bell"]
 
     await asyncio.to_thread(send_ntfy_push, topic, title, message, click_url, priority, tags)
 

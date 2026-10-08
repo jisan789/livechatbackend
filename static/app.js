@@ -869,7 +869,6 @@ function handleWsMessage(msg) {
     // ── Wake Up / Call Alert (Live WebSocket) ─────
     case 'wake_up':
     case 'ping_call':
-      playWakeUpChime('incoming');
       if (navigator.vibrate) {
         try { navigator.vibrate([180, 80, 180, 80, 240]); } catch (e) {}
       }
@@ -2357,46 +2356,6 @@ function applyOpponentProfile(url, name) {
 let wakeUpCooldownTimer = null;
 let wakeUpCooldownRemaining = 0;
 
-function playWakeUpChime(type = 'ping') {
-  if (!soundEnabled) return;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    if (!audioCtx) audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = 'sine';
-    if (type === 'incoming') {
-      // 3-tone ascending alert chime
-      osc.frequency.setValueAtTime(523.25, now);         // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.12);    // E5
-      osc.frequency.setValueAtTime(783.99, now + 0.24);    // G5
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.95);
-    } else {
-      // 2-tone crisp outgoing ping chime
-      osc.frequency.setValueAtTime(587.33, now);         // D5
-      osc.frequency.setValueAtTime(880.00, now + 0.1);     // A5
-      gain.gain.setValueAtTime(0.28, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.6);
-    }
-  } catch (e) {
-    console.warn('[Audio] Wakeup chime error:', e);
-  }
-}
-
 function updateWakeUpButtonsCooldown(remaining) {
   const btns = [wakeUpBtn, chatsWakeUpBtn, statusPingChip].filter(Boolean);
   btns.forEach(btn => {
@@ -2442,36 +2401,54 @@ async function triggerWakeUp() {
   }
 
   const partnerName = currentPartner.name || (activeUser === 'jisu' ? 'Jenu' : 'Jisu');
-  playWakeUpChime('ping');
+  const senderName = USER_PROFILES[activeUser]?.userName || (activeUser === 'jisu' ? 'Jisu' : 'Jenu');
+
+  // NO sound on user browser side — notification sound plays on mobile app only
   if (navigator.vibrate) {
-    try { navigator.vibrate([80, 50, 80]); } catch (e) {}
+    try { navigator.vibrate([60, 40, 60]); } catch (e) {}
   }
 
   startWakeUpCooldown(12);
 
-  // 1. Send via WebSocket if open
+  // 1. DIRECT PUSH to ntfy.sh from browser (guarantees instant delivery to mobile app!)
+  try {
+    fetch('https://ntfy.sh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: 'penappnotify',
+        title: `LiveChat: ${senderName} is calling you!`,
+        message: `${senderName} wants you to come online now! Tap to open. 💬`,
+        priority: 5,
+        tags: ['bell', 'phone', 'zap'],
+        click: window.location.href
+      })
+    }).then(res => {
+      console.log('[ntfy] Direct push dispatched to penappnotify, status:', res.status);
+    }).catch(err => {
+      console.warn('[ntfy] Direct push error:', err);
+    });
+  } catch (err) {
+    console.warn('[ntfy] Push trigger error:', err);
+  }
+
+  // 2. Send via WebSocket if open
   if (ws && ws.readyState === WebSocket.OPEN) {
     wsSend({ type: 'wake_up' });
   }
 
-  // 2. Send via REST endpoint to guarantee ntfy push notification fires
+  // 3. Send via server API as backup
   try {
-    const res = await fetch('/api/wake_up', {
+    fetch('/api/wake_up', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user: activeUser })
-    });
-    const data = await res.json();
-    if (data.status === 'cooldown') {
-      startWakeUpCooldown(data.remaining || 8);
-      showToast(`Cooldown active (${data.remaining}s)`, 'info');
-      return;
-    }
+    }).catch(e => console.warn('/api/wake_up error:', e));
   } catch (err) {
-    console.warn('[WakeUp] REST fallback err:', err);
+    console.warn('[WakeUp] Server fallback error:', err);
   }
 
-  showToast(`🔔 Push alert sent to ${partnerName}'s phone!`, 'success');
+  showToast(`🔔 Notification sent to ${partnerName}'s mobile app!`, 'success');
 }
 
 function showIncomingWakeUpBanner(callerName) {
