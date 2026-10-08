@@ -370,7 +370,7 @@ async function refreshOpponentPresence() {
       if (data.last_seen) {
         opponentLastSeen = data.last_seen;
       }
-      setPresenceUI(isOpponentOnline, opponentLastSeen);
+      setPresenceUI(isOpponentOnline);
     }
   } catch (_) {}
 }
@@ -497,7 +497,7 @@ async function loadChatHistory(userKey) {
       if (data.opponent_last_seen) {
         opponentLastSeen = data.opponent_last_seen;
       }
-      setPresenceUI(isOpponentOnline, opponentLastSeen);
+      setPresenceUI(isOpponentOnline);
     }
 
     // Since the user is viewing chat history, mark all incoming messages seen
@@ -617,7 +617,7 @@ function handleWsMessage(msg) {
         if (msg.last_seen) {
           opponentLastSeen = msg.last_seen;
         }
-        setPresenceUI(isOpponentOnline, opponentLastSeen);
+        setPresenceUI(isOpponentOnline);
       }
       break;
 
@@ -670,133 +670,29 @@ function handleWsMessage(msg) {
 }
 
 // ─────────────────────────────────────────────────
-//  Presence UI & Last Seen Formatting
+//  Presence UI (Online / Offline)
 // ─────────────────────────────────────────────────
-function formatLastSeen(isoString) {
-  let dateObj = null;
-
-  if (isoString) {
-    try {
-      let cleanStr = String(isoString).trim();
-      if (!cleanStr.includes('T') && cleanStr.includes(' ')) {
-        cleanStr = cleanStr.replace(' ', 'T') + 'Z';
-      } else if (!cleanStr.endsWith('Z') && !cleanStr.includes('+')) {
-        cleanStr = cleanStr + 'Z';
-      }
-      const parsed = new Date(cleanStr);
-      if (!isNaN(parsed.getTime())) {
-        dateObj = parsed;
-      }
-    } catch (_) {}
-  }
-
-  // Fallback to local storage cached last seen
-  if (!dateObj && currentPartner && currentPartner.key) {
-    try {
-      const cached = localStorage.getItem('chat_last_seen_' + currentPartner.key);
-      if (cached) {
-        const parsed = new Date(cached);
-        if (!isNaN(parsed.getTime())) dateObj = parsed;
-      }
-    } catch (_) {}
-  }
-
-  // Fallback to last bubble time in chat DOM or recent timestamp
-  if (!dateObj) {
-    const lastTimeEl = document.querySelector('#chatMessages .message-row:last-child .bubble-time');
-    if (lastTimeEl && lastTimeEl.textContent.trim()) {
-      return `Last active at ${lastTimeEl.textContent.trim()}`;
-    }
-    dateObj = new Date();
-  }
-
-  const now = new Date();
-  const diffMs = Math.max(0, now.getTime() - dateObj.getTime());
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-
-  // Format 12-hour local time (e.g. 10:45 PM)
-  let hours = dateObj.getHours();
-  const minutes = dateObj.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  const strMinutes = minutes < 10 ? '0' + minutes : minutes;
-  const timeStr = `${hours}:${strMinutes} ${ampm}`;
-
-  if (diffSec < 45) {
-    return `Last active just now (${timeStr})`;
-  }
-
-  if (diffMin < 60) {
-    return `Last active at ${timeStr} (${diffMin}m ago)`;
-  }
-
-  const isToday = now.toDateString() === dateObj.toDateString();
-  if (isToday) {
-    return `Last active today at ${timeStr}`;
-  }
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = yesterday.toDateString() === dateObj.toDateString();
-  if (isYesterday) {
-    return `Last active yesterday at ${timeStr}`;
-  }
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = months[dateObj.getMonth()];
-  const day = dateObj.getDate();
-
-  if (now.getFullYear() === dateObj.getFullYear()) {
-    return `Last active ${month} ${day} at ${timeStr}`;
-  }
-
-  return `Last active ${month} ${day}, ${dateObj.getFullYear()} at ${timeStr}`;
-}
-
-function setPresenceUI(online, lastSeen = null) {
-  if (lastSeen !== null && lastSeen !== undefined) {
-    opponentLastSeen = lastSeen;
-    if (currentPartner && currentPartner.key) {
-      try {
-        localStorage.setItem('chat_last_seen_' + currentPartner.key, String(lastSeen));
-      } catch (_) {}
-    }
-  }
+function setPresenceUI(online) {
+  isOpponentOnline = Boolean(online);
   const badge = avatarBadge || document.getElementById('avatarBadge') || document.querySelector('.avatar-badge');
   if (badge) {
-    badge.classList.toggle('is-online', Boolean(online));
+    badge.classList.toggle('is-online', isOpponentOnline);
   }
   if (userStatusEl && !opponentTyping) {
-    if (online) {
+    if (isOpponentOnline) {
       userStatusEl.textContent = 'Online';
       userStatusEl.className = 'user-status is-online';
     } else {
-      userStatusEl.textContent = formatLastSeen(opponentLastSeen);
+      userStatusEl.textContent = 'Offline';
       userStatusEl.className = 'user-status is-offline';
     }
   }
 }
 
-function setPresenceOffline(lastSeen = null) {
+function setPresenceOffline() {
   isOpponentOnline = false;
-  if (lastSeen) {
-    opponentLastSeen = lastSeen;
-    if (currentPartner && currentPartner.key) {
-      try {
-        localStorage.setItem('chat_last_seen_' + currentPartner.key, String(lastSeen));
-      } catch (_) {}
-    }
-  }
-  setPresenceUI(false, opponentLastSeen);
+  setPresenceUI(false);
 }
-
-// Keep relative last seen times updated automatically
-setInterval(() => {
-  if (activeUser && !isOpponentOnline && !opponentTyping && userStatusEl) {
-    userStatusEl.textContent = formatLastSeen(opponentLastSeen);
-  }
-}, 10000);
 
 // ─────────────────────────────────────────────────
 //  Typing Indicators & Snappy Live Keystroke Stream
@@ -897,7 +793,7 @@ function showOpponentTyping() {
 
 function hideOpponentTyping() {
   opponentTyping = false;
-  setPresenceUI(isOpponentOnline, opponentLastSeen);
+  setPresenceUI(isOpponentOnline);
   if (typingIndicator) {
     typingIndicator.classList.remove('active');
   }
