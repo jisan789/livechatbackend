@@ -51,6 +51,10 @@ def init_db():
                 cursor.execute("ALTER TABLE messages ADD COLUMN seen INTEGER DEFAULT 0;")
             except Exception:
                 pass
+            try:
+                cursor.execute("ALTER TABLE messages ADD COLUMN reply_to TEXT;")
+            except Exception:
+                pass
 
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_messages_pair 
@@ -132,6 +136,7 @@ def save_message(
     media_duration: Optional[float] = None,
     client_time: Optional[str] = None,
     seen: bool = False,
+    reply_to: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Persist a message to PHP endpoint or SQLite."""
     payload = {
@@ -144,6 +149,7 @@ def save_message(
         "media_duration": media_duration,
         "client_time": client_time,
         "seen": seen,
+        "reply_to": reply_to,
     }
 
     # If PHP_STORAGE_URL is configured, send HTTP POST to PHP receiver
@@ -169,12 +175,13 @@ def save_message(
     # SQLite fallback
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
+        reply_to_str = json.dumps(reply_to) if isinstance(reply_to, (dict, list)) else (str(reply_to) if reply_to else None)
         cursor.execute(
             """
-            INSERT INTO messages (sender, recipient, msg_type, text_content, media_duration, client_time, seen)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (sender, recipient, msg_type, text_content, media_duration, client_time, seen, reply_to)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (sender, recipient, msg_type, text_content, media_duration, client_time, 1 if seen else 0),
+            (sender, recipient, msg_type, text_content, media_duration, client_time, 1 if seen else 0, reply_to_str),
         )
         msg_id = cursor.lastrowid
         conn.commit()
@@ -184,6 +191,11 @@ def save_message(
         if row:
             d = dict(row)
             d["seen"] = bool(d.get("seen", 0))
+            if d.get("reply_to") and isinstance(d["reply_to"], str):
+                try:
+                    d["reply_to"] = json.loads(d["reply_to"])
+                except Exception:
+                    pass
             return d
         return {
             "id": msg_id,
@@ -194,6 +206,7 @@ def save_message(
             "media_duration": media_duration,
             "client_time": client_time,
             "seen": seen,
+            "reply_to": reply_to,
         }
 
 
@@ -316,6 +329,11 @@ def get_conversation(user1: str, user2: str, limit: int = 200) -> List[Dict[str,
         for row in rows:
             d = dict(row)
             d["seen"] = bool(d.get("seen", 0))
+            if d.get("reply_to") and isinstance(d["reply_to"], str):
+                try:
+                    d["reply_to"] = json.loads(d["reply_to"])
+                except Exception:
+                    pass
             result_list.append(d)
         return result_list
 

@@ -38,6 +38,15 @@ const pinDotsContainer   = document.getElementById('pinDots');
 const pinFeedback        = document.getElementById('pinFeedback');
 const pinBackspaceBtn    = document.getElementById('pinBackspaceBtn');
 
+const replyPreviewBar          = document.getElementById('replyPreviewBar');
+const replyPreviewTitle        = document.getElementById('replyPreviewTitle');
+const replyPreviewText         = document.getElementById('replyPreviewText');
+const replyPreviewThumbWrapper = document.getElementById('replyPreviewThumbWrapper');
+const replyPreviewThumb        = document.getElementById('replyPreviewThumb');
+const replyPreviewCloseBtn     = document.getElementById('replyPreviewCloseBtn');
+
+let activeReplyContext = null;
+
 // ─────────────────────────────────────────────────
 //  User Profiles
 // ─────────────────────────────────────────────────
@@ -387,14 +396,21 @@ async function loadChatHistory(userKey) {
         continue;
       }
 
+      let replyToData = msg.reply_to || null;
+      if (replyToData && typeof replyToData === 'string') {
+        try {
+          replyToData = JSON.parse(replyToData);
+        } catch (_) {}
+      }
+
       if (msg.msg_type === 'chat') {
-        appendMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true);
+        appendMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'voice' && msg.text_content) {
-        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, msgIdStr, null, isSeen, true);
+        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, msgIdStr, null, isSeen, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'image' && msg.text_content) {
-        appendImageMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true);
+        appendImageMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true, replyToData);
         appendedAny = true;
       }
       existingMsgIds.add(msgIdStr);
@@ -533,17 +549,17 @@ function handleWsMessage(msg) {
 
     // ── Chat message ──────────────────────────────
     case 'chat':
-      receiveIncomingMessage(msg.text, msg.time, msg.id);
+      receiveIncomingMessage(msg.text, msg.time, msg.id, msg.reply_to);
       break;
 
     // ── Voice note (Live WebSocket) ───────────────
     case 'voice':
-      receiveIncomingVoice(msg.audio, msg.duration, msg.time, msg.id, msg.waveform);
+      receiveIncomingVoice(msg.audio, msg.duration, msg.time, msg.id, msg.waveform, msg.reply_to);
       break;
 
     // ── Image message (Live WebSocket) ────────────
     case 'image':
-      receiveIncomingImage(msg.image, msg.time, msg.id);
+      receiveIncomingImage(msg.image, msg.time, msg.id, msg.reply_to);
       break;
 
     // ── Chat cleared ──────────────────────────────
@@ -783,9 +799,280 @@ function clearChatDOM() {
 }
 
 // ─────────────────────────────────────────────────
+//  Swipe to Reply & Quoted Message Management
+// ─────────────────────────────────────────────────
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function setReplyContext(replyObj) {
+  if (!replyObj) return;
+  activeReplyContext = replyObj;
+
+  if (replyPreviewBar && replyPreviewTitle && replyPreviewText) {
+    const senderName = replyObj.sender_name || replyObj.sender || (currentPartner ? currentPartner.name : 'Opponent');
+    replyPreviewTitle.textContent = `Replying to ${senderName}`;
+
+    let previewText = replyObj.text || '';
+    if (replyObj.msg_type === 'voice') {
+      const dur = replyObj.media_duration ? formatDuration(Math.round(replyObj.media_duration)) : '';
+      previewText = `🎙️ Voice message ${dur ? `(${dur})` : ''}`;
+    } else if (replyObj.msg_type === 'image') {
+      previewText = '📷 Photo';
+    }
+    replyPreviewText.textContent = previewText || 'Message';
+
+    if (replyPreviewThumbWrapper && replyPreviewThumb) {
+      if (replyObj.msg_type === 'image' && (replyObj.image || replyObj.imageUrl)) {
+        replyPreviewThumb.src = replyObj.image || replyObj.imageUrl;
+        replyPreviewThumbWrapper.style.display = 'block';
+      } else {
+        replyPreviewThumbWrapper.style.display = 'none';
+        replyPreviewThumb.src = '';
+      }
+    }
+
+    replyPreviewBar.style.display = 'flex';
+  }
+
+  keepInputFocused();
+}
+
+function clearReplyContext() {
+  activeReplyContext = null;
+  if (replyPreviewBar) {
+    replyPreviewBar.style.display = 'none';
+  }
+  if (replyPreviewThumb) {
+    replyPreviewThumb.src = '';
+  }
+}
+
+function createReplyQuoteElement(replyTo) {
+  if (!replyTo) return null;
+  const quoteEl = document.createElement('div');
+  quoteEl.className = 'reply-quote-chip';
+  const targetId = replyTo.id || replyTo.msg_id || '';
+  if (targetId) {
+    quoteEl.dataset.replyToId = targetId;
+  }
+
+  const senderName = replyTo.sender_name || replyTo.sender || (currentPartner ? currentPartner.name : 'Opponent');
+  let snippet = replyTo.text || replyTo.text_content || '';
+  const msgType = replyTo.msg_type || replyTo.type || 'chat';
+
+  if (msgType === 'voice') {
+    const dur = replyTo.media_duration ? formatDuration(Math.round(replyTo.media_duration)) : '';
+    snippet = `🎙️ Voice message ${dur ? `(${dur})` : ''}`;
+  } else if (msgType === 'image') {
+    snippet = '📷 Photo';
+  }
+
+  quoteEl.innerHTML = `
+    <div class="reply-quote-line"></div>
+    <div class="reply-quote-inner">
+      <div class="reply-quote-sender">${escapeHtml(senderName)}</div>
+      <div class="reply-quote-snippet">${escapeHtml(snippet)}</div>
+    </div>
+  `;
+
+  if (msgType === 'image' && (replyTo.image || replyTo.imageUrl || replyTo.text_content)) {
+    const thumbImg = document.createElement('img');
+    thumbImg.className = 'reply-quote-thumb';
+    thumbImg.src = replyTo.image || replyTo.imageUrl || replyTo.text_content;
+    thumbImg.alt = 'Photo';
+    quoteEl.appendChild(thumbImg);
+  }
+
+  quoteEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!targetId) return;
+    const targetRow = document.querySelector(`#chatMessages .message-row[data-msg-id="${targetId}"]`) ||
+                      document.querySelector(`#chatMessages .message-row[data-db-id="${targetId}"]`);
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetRow.classList.add('message-highlight-pulse');
+      setTimeout(() => targetRow.classList.remove('message-highlight-pulse'), 1600);
+    } else {
+      showToast('Original message not found in view', 'info');
+    }
+  });
+
+  return quoteEl;
+}
+
+function attachSwipeToReply(messageRow, messageData) {
+  // CRITICAL: Only opponent (incoming) messages can be replied to!
+  // Own (outgoing) messages CANNOT be replied to.
+  if (!messageRow || !messageRow.classList.contains('incoming')) return;
+
+  const bubbleGroup = messageRow.querySelector('.bubble-group');
+  if (!bubbleGroup) return;
+
+  let indicator = messageRow.querySelector('.swipe-reply-indicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.className = 'swipe-reply-indicator';
+    indicator.innerHTML = `
+      <div class="swipe-reply-icon-circle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 17 4 12 9 7"></polyline>
+          <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+        </svg>
+      </div>
+    `;
+    messageRow.insertBefore(indicator, messageRow.firstChild);
+  }
+
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let currentY = 0;
+  let isSwiping = false;
+  let hasTriggeredHaptic = false;
+  const THRESHOLD = 38;
+  const MAX_TRANSLATE = 65;
+
+  function onTouchStart(e) {
+    if (e.touches && e.touches.length > 1) return;
+    const touch = e.touches ? e.touches[0] : e;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = startX;
+    currentY = startY;
+    isSwiping = false;
+    hasTriggeredHaptic = false;
+    bubbleGroup.style.transition = 'none';
+    if (indicator) indicator.style.transition = 'none';
+  }
+
+  function onTouchMove(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+    const diffX = currentX - startX;
+    const diffY = currentY - startY;
+
+    if (!isSwiping) {
+      if (diffX > 7 && Math.abs(diffX) > Math.abs(diffY) * 1.1) {
+        isSwiping = true;
+      } else if (Math.abs(diffY) > 8) {
+        return;
+      }
+    }
+
+    if (isSwiping && diffX > 0) {
+      if (e.cancelable) e.preventDefault();
+      const clampedDx = Math.min(MAX_TRANSLATE, diffX * 0.65);
+      bubbleGroup.style.transform = `translateX(${clampedDx}px)`;
+
+      const progress = Math.min(1, clampedDx / THRESHOLD);
+      if (indicator) {
+        indicator.style.opacity = progress;
+        indicator.style.transform = `translateY(-50%) translateX(${Math.min(clampedDx * 0.45, 20)}px) scale(${0.7 + progress * 0.35})`;
+        indicator.classList.toggle('ready', clampedDx >= THRESHOLD);
+      }
+
+      if (clampedDx >= THRESHOLD && !hasTriggeredHaptic) {
+        hasTriggeredHaptic = true;
+        if (navigator.vibrate) {
+          try { navigator.vibrate(12); } catch (_) {}
+        }
+      } else if (clampedDx < THRESHOLD && hasTriggeredHaptic) {
+        hasTriggeredHaptic = false;
+      }
+    }
+  }
+
+  function onTouchEnd() {
+    if (!isSwiping) return;
+    isSwiping = false;
+
+    const diffX = currentX - startX;
+    const passed = (diffX * 0.65) >= THRESHOLD;
+
+    bubbleGroup.style.transition = 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    bubbleGroup.style.transform = 'translateX(0px)';
+
+    if (indicator) {
+      indicator.style.transition = 'all 0.22s ease';
+      indicator.style.opacity = '0';
+      indicator.style.transform = 'translateY(-50%) translateX(0px) scale(0.6)';
+      indicator.classList.remove('ready');
+    }
+
+    if (passed) {
+      const msgId = messageData?.id || messageRow.dataset.msgId || messageRow.dataset.dbId || '';
+      const senderName = currentPartner ? currentPartner.name : 'Opponent';
+      const senderKey = currentPartner ? currentPartner.key : 'opponent';
+      const msgType = messageData?.msgType || 'chat';
+      let textSnippet = messageData?.text || '';
+
+      if (msgType === 'chat' && !textSnippet) {
+        const textNode = messageRow.querySelector('.bubble');
+        if (textNode) {
+          const clone = textNode.cloneNode(true);
+          clone.querySelectorAll('.seen-dot, .reply-quote-chip').forEach(el => el.remove());
+          textSnippet = clone.textContent.trim();
+        }
+      }
+
+      setReplyContext({
+        id: msgId,
+        sender: senderKey,
+        sender_name: senderName,
+        msg_type: msgType,
+        text: textSnippet,
+        media_duration: messageData?.mediaDuration || null,
+        imageUrl: messageData?.imageUrl || null,
+        image: messageData?.imageUrl || null
+      });
+    }
+
+    setTimeout(() => {
+      bubbleGroup.style.transition = '';
+      bubbleGroup.style.transform = '';
+    }, 300);
+  }
+
+  messageRow.addEventListener('touchstart', onTouchStart, { passive: true });
+  messageRow.addEventListener('touchmove', onTouchMove, { passive: false });
+  messageRow.addEventListener('touchend', onTouchEnd, { passive: true });
+  messageRow.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+  // Mouse / Pointer drag for desktop testing
+  let isMouseDown = false;
+  messageRow.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.closest('.voice-play-btn, .chat-image-preview, .reply-quote-chip')) return;
+    isMouseDown = true;
+    onTouchStart(e);
+
+    const onMouseMove = (ev) => {
+      if (!isMouseDown) return;
+      onTouchMove(ev);
+    };
+    const onMouseUp = (ev) => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      onTouchEnd(ev);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+}
+
+// ─────────────────────────────────────────────────
 //  Incoming Chat Message
 // ─────────────────────────────────────────────────
-function receiveIncomingMessage(text, timeStr, messageId = null) {
+function receiveIncomingMessage(text, timeStr, messageId = null, replyTo = null) {
   hideOpponentTyping();
 
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
@@ -805,12 +1092,24 @@ function receiveIncomingMessage(text, timeStr, messageId = null) {
     if (cursorNode) cursorNode.remove();
     if (bubble) bubble.classList.remove('live-typing-bubble');
 
+    if (replyTo && bubble) {
+      const quoteEl = createReplyQuoteElement(replyTo);
+      if (quoteEl) bubble.prepend(quoteEl);
+    }
+
     const timeEl = document.createElement('div');
     timeEl.className = 'message-time';
     timeEl.textContent = timeStr || formatCurrentTime();
     currentLiveIncomingRow.appendChild(timeEl);
 
     currentLiveIncomingRow.dataset.msgId = assignedId;
+    attachSwipeToReply(currentLiveIncomingRow, {
+      id: assignedId,
+      sender: currentPartner ? currentPartner.name : 'Opponent',
+      msgType: 'chat',
+      text: text
+    });
+
     currentLiveIncomingRow = null;
     scrollToBottom();
     if (activeUser && currentPartner.key) {
@@ -821,7 +1120,7 @@ function receiveIncomingMessage(text, timeStr, messageId = null) {
   }
 
   // Otherwise, append standard incoming message bubble
-  appendMessage(text, 'incoming', timeStr, assignedId);
+  appendMessage(text, 'incoming', timeStr, assignedId, false, false, replyTo);
   if (activeUser && currentPartner.key) {
     notifyMessageSeen(assignedId);
   }
@@ -837,7 +1136,10 @@ function handleSend() {
 
   const clientTime = formatCurrentTime();
   const msgId = 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-  appendMessage(text, 'outgoing', clientTime, msgId, false);
+  const replyPayload = activeReplyContext ? { ...activeReplyContext } : null;
+  clearReplyContext();
+
+  appendMessage(text, 'outgoing', clientTime, msgId, false, false, replyPayload);
   chatInput.value = '';
   lastLocalTextLength = 0;
   chatInput.dispatchEvent(new Event('input'));
@@ -855,7 +1157,11 @@ function handleSend() {
   clearTimeout(typingOutTimer);
 
   // Send the chat message (silently queued in background if offline)
-  wsSend({ type: 'chat', text, time: clientTime, id: msgId }, true);
+  const payload = { type: 'chat', text, time: clientTime, id: msgId };
+  if (replyPayload) {
+    payload.reply_to = replyPayload;
+  }
+  wsSend(payload, true);
 
   // Automatically trigger emoji balloon animation if couple keywords are present
   triggerKeywordEmojiAnimations(text, true);
@@ -864,7 +1170,7 @@ function handleSend() {
 // ─────────────────────────────────────────────────
 //  Append Message Bubble
 // ─────────────────────────────────────────────────
-function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false) {
+function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -878,7 +1184,18 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = content;
+
+  if (replyTo) {
+    const quoteEl = createReplyQuoteElement(replyTo);
+    if (quoteEl) {
+      bubble.appendChild(quoteEl);
+    }
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'bubble-text-content';
+  textSpan.textContent = content;
+  bubble.appendChild(textSpan);
 
   if (type === 'outgoing') {
     const seenDot = document.createElement('span');
@@ -894,6 +1211,15 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   bubbleGroup.appendChild(bubble);
   messageRow.appendChild(bubbleGroup);
   messageRow.appendChild(timeEl);
+
+  if (type === 'incoming') {
+    attachSwipeToReply(messageRow, {
+      id: assignedId,
+      sender: currentPartner ? currentPartner.name : 'Opponent',
+      msgType: 'chat',
+      text: content
+    });
+  }
 
   chatMessages.insertBefore(messageRow, typingIndicator);
   if (!skipScroll) {
@@ -987,7 +1313,7 @@ const DEFAULT_SPEECH_WAVEFORM = [
 let currentlyPlayingVoiceAudio = null;
 let currentlyPlayingVoiceReset = null;
 
-function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeen = false, skipScroll = false) {
+function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeen = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -1005,6 +1331,13 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
 
+  if (replyTo) {
+    const quoteEl = createReplyQuoteElement(replyTo);
+    if (quoteEl) {
+      bubble.appendChild(quoteEl);
+    }
+  }
+
   // Build 32 waveform bars (from custom mic samples or realistic speech contour)
   let barHeights = DEFAULT_SPEECH_WAVEFORM;
   if (Array.isArray(customWaveform) && customWaveform.length >= 8) {
@@ -1012,7 +1345,7 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   }
   const barsHtml = barHeights.map(h => `<span class="waveform-bar" style="height:${Math.max(4, Math.min(26, h))}px;"></span>`).join('');
 
-  bubble.innerHTML = `
+  const voiceBubbleHtml = `
     <div class="voice-bubble">
       <button class="voice-play-btn" type="button" aria-label="Play Voice Note" title="Play">
         <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -1026,6 +1359,10 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
       <div class="voice-waveform" title="Click to seek">${barsHtml}</div>
       <span class="voice-duration">${durationText}</span>
     </div>`;
+
+  const voiceWrap = document.createElement('div');
+  voiceWrap.innerHTML = voiceBubbleHtml;
+  bubble.appendChild(voiceWrap.firstElementChild);
 
   if (type === 'outgoing') {
     const seenDot = document.createElement('span');
@@ -1041,6 +1378,16 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   bubbleGroup.appendChild(bubble);
   messageRow.appendChild(bubbleGroup);
   messageRow.appendChild(timeEl);
+
+  if (type === 'incoming') {
+    attachSwipeToReply(messageRow, {
+      id: assignedId,
+      sender: currentPartner ? currentPartner.name : 'Opponent',
+      msgType: 'voice',
+      mediaDuration: durationSec,
+      text: `🎙️ Voice message (${durationText})`
+    });
+  }
 
   chatMessages.insertBefore(messageRow, typingIndicator);
   if (!skipScroll) {
@@ -1158,7 +1505,7 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   });
 }
 
-function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, waveform = null) {
+function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, waveform = null, replyTo = null) {
   hideOpponentTyping();
 
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
@@ -1166,7 +1513,7 @@ function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, wa
   }
 
   playOpponentKeypressSound();
-  appendVoiceMessage(audioData, duration, 'incoming', timeStr, messageId, waveform);
+  appendVoiceMessage(audioData, duration, 'incoming', timeStr, messageId, waveform, false, false, replyTo);
 
   if (activeUser && currentPartner.key && messageId) {
     notifyMessageSeen(messageId);
@@ -1237,24 +1584,30 @@ async function handleSendImage(file) {
     const compressedDataUrl = await compressImage(file);
     const clientTime = formatCurrentTime();
     const msgId = 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const replyPayload = activeReplyContext ? { ...activeReplyContext } : null;
+    clearReplyContext();
 
     // 1. Render in sender's own chat
-    appendImageMessage(compressedDataUrl, 'outgoing', clientTime, msgId, false);
+    appendImageMessage(compressedDataUrl, 'outgoing', clientTime, msgId, false, false, replyPayload);
 
     // 2. Broadcast via WebSocket (silently queued in background if offline)
-    wsSend({
+    const payload = {
       type: 'image',
       image: compressedDataUrl,
       time: clientTime,
       id: msgId
-    }, true);
+    };
+    if (replyPayload) {
+      payload.reply_to = replyPayload;
+    }
+    wsSend(payload, true);
   } catch (err) {
     console.error('[Image] Failed to process image:', err);
     showToast('Failed to send image', 'error');
   }
 }
 
-function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false) {
+function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -1268,6 +1621,13 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble image-bubble';
+
+  if (replyTo) {
+    const quoteEl = createReplyQuoteElement(replyTo);
+    if (quoteEl) {
+      bubble.appendChild(quoteEl);
+    }
+  }
 
   const container = document.createElement('div');
   container.className = 'image-container';
@@ -1307,13 +1667,23 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   messageRow.appendChild(bubbleGroup);
   messageRow.appendChild(timeEl);
 
+  if (type === 'incoming') {
+    attachSwipeToReply(messageRow, {
+      id: assignedId,
+      sender: currentPartner ? currentPartner.name : 'Opponent',
+      msgType: 'image',
+      imageUrl: imageUrl,
+      text: '📷 Photo'
+    });
+  }
+
   chatMessages.insertBefore(messageRow, typingIndicator);
   if (!skipScroll) {
     scrollToBottom();
   }
 }
 
-function receiveIncomingImage(imageUrl, timeStr, messageId = null) {
+function receiveIncomingImage(imageUrl, timeStr, messageId = null, replyTo = null) {
   hideOpponentTyping();
 
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
@@ -1322,7 +1692,7 @@ function receiveIncomingImage(imageUrl, timeStr, messageId = null) {
 
   const assignedId = messageId || ('msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   playOpponentKeypressSound();
-  appendImageMessage(imageUrl, 'incoming', timeStr, assignedId);
+  appendImageMessage(imageUrl, 'incoming', timeStr, assignedId, false, false, replyTo);
 
   if (activeUser && currentPartner.key) {
     notifyMessageSeen(assignedId);
@@ -1518,18 +1888,24 @@ async function startVoiceRecording() {
       const base64Audio = reader.result;
       const clientTime = formatCurrentTime();
       const voiceMsgId = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const replyPayload = activeReplyContext ? { ...activeReplyContext } : null;
+      clearReplyContext();
 
-      appendVoiceMessage(base64Audio, finalDuration, 'outgoing', clientTime, voiceMsgId, waveformContour);
+      appendVoiceMessage(base64Audio, finalDuration, 'outgoing', clientTime, voiceMsgId, waveformContour, false, false, replyPayload);
 
       // Sent via live WebSocket & persisted (silently queued in background if offline)
-      wsSend({
+      const payload = {
         type: 'voice',
         audio: base64Audio,
         duration: finalDuration,
         waveform: waveformContour,
         time: clientTime,
         id: voiceMsgId
-      }, true);
+      };
+      if (replyPayload) {
+        payload.reply_to = replyPayload;
+      }
+      wsSend(payload, true);
     };
     reader.readAsDataURL(audioBlob);
   };
@@ -1682,25 +2058,40 @@ function setupEventListeners() {
   // Prevent chat messages or blank space from dismissing keyboard
   if (chatMessages) {
     chatMessages.addEventListener('pointerdown', (e) => {
-      if (document.activeElement === chatInput && !e.target.closest('.voice-play-btn')) {
+      if (document.activeElement === chatInput && !e.target.closest('.voice-play-btn, .reply-preview-close-btn, .reply-quote-chip')) {
         e.preventDefault();
         keepInputFocused();
       }
     });
 
     chatMessages.addEventListener('mousedown', (e) => {
-      if (document.activeElement === chatInput && !e.target.closest('.voice-play-btn')) {
+      if (document.activeElement === chatInput && !e.target.closest('.voice-play-btn, .reply-preview-close-btn, .reply-quote-chip')) {
         e.preventDefault();
         keepInputFocused();
       }
     });
 
     chatMessages.addEventListener('touchstart', (e) => {
-      if (document.activeElement === chatInput) {
+      if (document.activeElement === chatInput && !e.target.closest('.reply-preview-close-btn, .reply-quote-chip')) {
         keepInputFocused();
       }
     }, { passive: true });
   }
+
+  // Reply preview close button
+  if (replyPreviewCloseBtn) {
+    replyPreviewCloseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearReplyContext();
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && activeReplyContext) {
+      clearReplyContext();
+    }
+  });
   // Sound toggle
   if (soundToggleBtn) {
     const onIcon  = soundToggleBtn.querySelector('.sound-on-icon');

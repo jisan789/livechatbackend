@@ -439,6 +439,8 @@ if ($method === 'POST') {
         $textContent = saveImageFile($textContent);
     }
 
+    $replyTo = isset($input['reply_to']) ? $input['reply_to'] : null;
+
     $newRecord = [
         'sender' => $sender,
         'recipient' => $recipient,
@@ -447,6 +449,7 @@ if ($method === 'POST') {
         'media_duration' => $mediaDuration,
         'client_time' => $clientTime,
         'seen' => $seen,
+        'reply_to' => $replyTo,
     ];
 
     $saved = appendMessage($dataFile, $newRecord);

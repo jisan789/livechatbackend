@@ -72,6 +72,7 @@ async def background_save_message(user_key: str, opponent: str, msg_type: str, d
             media_duration=data.get("duration"),
             client_time=data.get("time"),
             seen=False,
+            reply_to=data.get("reply_to"),
         )
         logger.info(f"[DB] Async saved {msg_type} #{saved.get('id')} from {user_key} to {opponent}")
     except Exception as e:
