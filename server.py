@@ -63,6 +63,7 @@ async def background_save_message(user_key: str, opponent: str, msg_type: str, d
             content = data.get("image")
         else:
             content = data.get("audio")
+        client_id = data.get("id") or data.get("client_msg_id")
         saved = await asyncio.to_thread(
             save_message,
             sender=user_key,
@@ -73,6 +74,7 @@ async def background_save_message(user_key: str, opponent: str, msg_type: str, d
             client_time=data.get("time"),
             seen=False,
             reply_to=data.get("reply_to"),
+            client_msg_id=client_id,
         )
         logger.info(f"[DB] Async saved {msg_type} #{saved.get('id')} from {user_key} to {opponent}")
     except Exception as e:
@@ -141,6 +143,19 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
 
             msg_type = data.get("type", "")
 
+            # 0. Heartbeat ping / presence check
+            if msg_type in ("ping", "presence_check"):
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+                asyncio.create_task(asyncio.to_thread(update_user_last_seen, user_key, now_iso))
+                opp_last = get_user_last_seen(opponent) if not (opponent in connections) else None
+                await safe_send(websocket, {
+                    "type": "pong" if msg_type == "ping" else "presence",
+                    "user": opponent,
+                    "status": "online" if (opponent in connections) else "offline",
+                    "last_seen": opp_last
+                })
+                continue
+
             # 1. Forward INSTANTLY over direct WebSocket (Zero Latency!)
             data["from"] = user_key
             await notify_opponent(user_key, data)
@@ -148,7 +163,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
             # 2. Persist chat, voice & image messages to PHP/DB in background task without blocking live chat.
             if msg_type in ("chat", "voice", "image"):
                 asyncio.create_task(background_save_message(user_key, opponent, msg_type, data))
-                now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
                 asyncio.create_task(asyncio.to_thread(update_user_last_seen, user_key, now_iso))
 
             # 3. Persist seen status to PHP/DB in background task
@@ -164,7 +179,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
         # If a new connection already replaced us, don't touch it.
         if connections.get(user_key) is websocket:
             connections.pop(user_key, None)
-            now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
             update_user_last_seen(user_key, now_iso)
             logger.info(f"[-] {user_key} disconnected (total: {len(connections)})")
             await notify_opponent(user_key, {

@@ -19,17 +19,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 2. Data file path
 $dataFile = __DIR__ . '/messages.json';
+$presenceFile = __DIR__ . '/presence.json';
 
-// Initialize data file if it doesn't exist
+// Initialize data files if they don't exist
 if (!file_exists($dataFile)) {
     file_put_contents($dataFile, json_encode([], JSON_PRETTY_PRINT));
     @chmod($dataFile, 0666);
 }
+if (!file_exists($presenceFile)) {
+    file_put_contents($presenceFile, json_encode([], JSON_PRETTY_PRINT));
+    @chmod($presenceFile, 0666);
+}
 
-// Protect messages.json from direct browser access via .htaccess if on Apache
+// Protect data files from direct browser access via .htaccess if on Apache
 $htaccessFile = __DIR__ . '/.htaccess';
 if (!file_exists($htaccessFile)) {
-    @file_put_contents($htaccessFile, "<Files \"messages.json\">\nOrder Allow,Deny\nDeny from all\n</Files>\n");
+    @file_put_contents($htaccessFile, "<FilesMatch \"\.(json)\$\">\nOrder Allow,Deny\nDeny from all\n</FilesMatch>\n");
+}
+
+// Helper: Read presence data
+function getPresenceData($file) {
+    if (!file_exists($file)) return [];
+    $content = @file_get_contents($file);
+    $data = json_decode($content, true);
+    return is_array($data) ? $data : [];
+}
+
+// Helper: Update presence timestamp
+function updatePresenceData($file, $user, $lastSeen = null) {
+    if (empty($user)) return false;
+    if (empty($lastSeen)) {
+        $lastSeen = gmdate('Y-m-d\TH:i:s\Z');
+    }
+    $data = getPresenceData($file);
+    $data[$user] = [
+        'last_seen' => $lastSeen,
+        'updated_at' => gmdate('Y-m-d H:i:s')
+    ];
+    @file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    return $lastSeen;
 }
 
 // Helper: Read messages with shared lock
@@ -334,7 +362,7 @@ if ($action === 'clear' || $action === 'empty') {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 1. GET: Retrieve messages
+// 1. GET: Retrieve messages & presence
 // Example: ?action=get&user1=jisu&user2=jenu
 // ─────────────────────────────────────────────────────────────
 if ($method === 'GET' || $action === 'get') {
@@ -374,16 +402,41 @@ if ($method === 'GET' || $action === 'get') {
         }
     }
 
+    $presenceData = getPresenceData($presenceFile);
+
     echo json_encode([
         'status' => 'ok',
         'count' => count($conversation),
-        'messages' => $conversation
+        'messages' => $conversation,
+        'presence' => $presenceData
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // ─────────────────────────────────────────────────────────────
-// 2. SEEN: Mark message(s) as seen
+// 2. PRESENCE: Update or Retrieve Presence / Last Seen
+// Example: POST or GET ?action=presence_update&user=jisu&last_seen=...
+// or ?action=presence_get&user=jenu
+// ─────────────────────────────────────────────────────────────
+if ($action === 'presence_update' || $action === 'update_presence') {
+    $input = is_array($jsonBody) ? $jsonBody : $_POST;
+    $user = isset($input['user']) ? trim($input['user']) : (isset($_GET['user']) ? trim($_GET['user']) : '');
+    $lastSeen = isset($input['last_seen']) ? trim($input['last_seen']) : (isset($_GET['last_seen']) ? trim($_GET['last_seen']) : '');
+    $res = updatePresenceData($presenceFile, $user, $lastSeen);
+    echo json_encode(['status' => 'ok', 'user' => $user, 'last_seen' => $res], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($action === 'presence_get' || $action === 'get_presence' || $action === 'presence') {
+    $user = isset($_GET['user']) ? trim($_GET['user']) : (isset($jsonBody['user']) ? trim($jsonBody['user']) : '');
+    $data = getPresenceData($presenceFile);
+    $lastSeen = isset($data[$user]['last_seen']) ? $data[$user]['last_seen'] : null;
+    echo json_encode(['status' => 'ok', 'user' => $user, 'last_seen' => $lastSeen, 'presence' => $data], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. SEEN: Mark message(s) as seen
 // Example: POST or GET ?action=seen&sender=jisu&recipient=jenu
 // or POST {"action":"seen","sender":"jisu","recipient":"jenu","ids":[1,2,3]}
 // ─────────────────────────────────────────────────────────────
@@ -407,11 +460,9 @@ if ($action === 'seen' || $action === 'mark_seen') {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. POST: Save a new message (chat or voice)
+// 4. POST: Save a new message (chat, voice, or image)
 // Example: POST JSON body:
-// {"sender":"jisu","recipient":"jenu","msg_type":"chat","text_content":"hello","client_time":"10:30 AM"}
-// or for voice:
-// {"sender":"jisu","recipient":"jenu","msg_type":"voice","text_content":"data:audio/webm;base64,...","media_duration":4.5}
+// {"sender":"jisu","recipient":"jenu","msg_type":"chat","text_content":"hello","client_time":"10:30 AM","client_msg_id":"msg_123"}
 // ─────────────────────────────────────────────────────────────
 if ($method === 'POST') {
     $input = is_array($jsonBody) ? $jsonBody : $_POST;
@@ -419,9 +470,10 @@ if ($method === 'POST') {
     $sender = isset($input['sender']) ? trim($input['sender']) : '';
     $recipient = isset($input['recipient']) ? trim($input['recipient']) : '';
     $msgType = isset($input['msg_type']) ? trim($input['msg_type']) : 'chat';
-    $textContent = isset($input['text_content']) ? $input['text_content'] : (isset($input['text']) ? $input['text'] : (isset($input['audio']) ? $input['audio'] : null));
+    $textContent = isset($input['text_content']) ? $input['text_content'] : (isset($input['text']) ? $input['text'] : (isset($input['audio']) ? $input['audio'] : (isset($input['image']) ? $input['image'] : null)));
     $mediaDuration = isset($input['media_duration']) ? (float)$input['media_duration'] : (isset($input['duration']) ? (float)$input['duration'] : null);
     $clientTime = isset($input['client_time']) ? trim($input['client_time']) : (isset($input['time']) ? trim($input['time']) : '');
+    $clientMsgId = isset($input['client_msg_id']) ? trim($input['client_msg_id']) : (isset($input['id']) ? trim($input['id']) : null);
     $seen = isset($input['seen']) ? (bool)$input['seen'] : false;
 
     if (!$sender || !$recipient) {
@@ -448,11 +500,15 @@ if ($method === 'POST') {
         'text_content' => $textContent,
         'media_duration' => $mediaDuration,
         'client_time' => $clientTime,
+        'client_msg_id' => $clientMsgId,
         'seen' => $seen,
         'reply_to' => $replyTo,
     ];
 
     $saved = appendMessage($dataFile, $newRecord);
+
+    // Update sender's presence to current time
+    updatePresenceData($presenceFile, $sender, gmdate('Y-m-d\TH:i:s\Z'));
 
     if ($saved) {
         echo json_encode([
@@ -474,6 +530,7 @@ echo json_encode([
     'endpoints' => [
         'get_messages' => 'GET ?action=get&user1=jisu&user2=jenu',
         'mark_seen' => 'POST or GET ?action=seen&sender=jisu&recipient=jenu',
-        'save_message' => 'POST with JSON body {sender, recipient, msg_type, text_content, client_time}'
+        'presence' => 'GET ?action=presence_get&user=jenu',
+        'save_message' => 'POST with JSON body {sender, recipient, msg_type, text_content, client_time, client_msg_id}'
     ]
 ]);

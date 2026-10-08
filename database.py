@@ -55,6 +55,10 @@ def init_db():
                 cursor.execute("ALTER TABLE messages ADD COLUMN reply_to TEXT;")
             except Exception:
                 pass
+            try:
+                cursor.execute("ALTER TABLE messages ADD COLUMN client_msg_id TEXT;")
+            except Exception:
+                pass
 
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_messages_pair 
@@ -84,11 +88,35 @@ def init_db():
 
 def update_user_last_seen(user_key: str, last_seen_str: Optional[str] = None) -> bool:
     """Record when a user was last active/seen."""
-    import datetime
     if not user_key:
         return False
     if not last_seen_str:
-        last_seen_str = datetime.datetime.utcnow().isoformat() + "Z"
+        import datetime
+        last_seen_str = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+    # If PHP_STORAGE_URL is configured, push to PHP storage presence endpoint
+    if PHP_STORAGE_URL:
+        try:
+            payload = {
+                "action": "presence_update",
+                "user": user_key,
+                "last_seen": last_seen_str,
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                PHP_STORAGE_URL,
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "LiveChat-Server/1.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                pass
+        except Exception as e:
+            logger.debug(f"[DB] PHP presence update skipped ({e})")
+
     try:
         with get_sqlite_connection() as conn:
             cursor = conn.cursor()
@@ -111,6 +139,23 @@ def get_user_last_seen(user_key: str) -> Optional[str]:
     """Retrieve the last seen ISO timestamp for a user."""
     if not user_key:
         return None
+
+    # Check external PHP storage first if configured
+    if PHP_STORAGE_URL:
+        try:
+            params = urllib.parse.urlencode({
+                "action": "presence_get",
+                "user": user_key
+            })
+            url = f"{PHP_STORAGE_URL}?{params}"
+            req = urllib.request.Request(url, headers={"User-Agent": "LiveChat-Server/1.0"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                if result.get("status") == "ok" and result.get("last_seen"):
+                    return result["last_seen"]
+        except Exception as e:
+            logger.debug(f"[DB] PHP get presence skipped ({e})")
+
     try:
         with get_sqlite_connection() as conn:
             cursor = conn.cursor()
@@ -137,6 +182,7 @@ def save_message(
     client_time: Optional[str] = None,
     seen: bool = False,
     reply_to: Optional[Any] = None,
+    client_msg_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Persist a message to PHP endpoint or SQLite."""
     payload = {
@@ -148,6 +194,7 @@ def save_message(
         "image": text_content if msg_type == "image" else None,
         "media_duration": media_duration,
         "client_time": client_time,
+        "client_msg_id": client_msg_id,
         "seen": seen,
         "reply_to": reply_to,
     }
@@ -178,10 +225,10 @@ def save_message(
         reply_to_str = json.dumps(reply_to) if isinstance(reply_to, (dict, list)) else (str(reply_to) if reply_to else None)
         cursor.execute(
             """
-            INSERT INTO messages (sender, recipient, msg_type, text_content, media_duration, client_time, seen, reply_to)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (sender, recipient, msg_type, text_content, media_duration, client_time, seen, reply_to, client_msg_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (sender, recipient, msg_type, text_content, media_duration, client_time, 1 if seen else 0, reply_to_str),
+            (sender, recipient, msg_type, text_content, media_duration, client_time, 1 if seen else 0, reply_to_str, client_msg_id),
         )
         msg_id = cursor.lastrowid
         conn.commit()
@@ -205,6 +252,7 @@ def save_message(
             "text_content": text_content,
             "media_duration": media_duration,
             "client_time": client_time,
+            "client_msg_id": client_msg_id,
             "seen": seen,
             "reply_to": reply_to,
         }

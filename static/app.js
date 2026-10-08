@@ -355,6 +355,22 @@ function markOutgoingMessagesSeen(targetMsgId = null, ids = null, isAll = false)
   }
 }
 
+async function refreshOpponentPresence() {
+  if (!activeUser) return;
+  try {
+    const res = await fetch(`/api/presence/${encodeURIComponent(activeUser)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.status === 'ok') {
+      isOpponentOnline = Boolean(data.is_online);
+      if (data.last_seen) {
+        opponentLastSeen = data.last_seen;
+      }
+      setPresenceUI(isOpponentOnline, opponentLastSeen);
+    }
+  } catch (_) {}
+}
+
 async function loadChatHistory(userKey) {
   if (!userKey) return;
   try {
@@ -363,16 +379,42 @@ async function loadChatHistory(userKey) {
     const data = await res.json();
     if (!data.messages) return;
 
-    const existingMsgIds = new Set();
-    document.querySelectorAll('#chatMessages .message-row[data-msg-id]').forEach(row => {
-      existingMsgIds.add(row.dataset.msgId);
+    // Index all existing rows in DOM by:
+    // 1. data-msg-id (client assigned ID)
+    // 2. data-db-id (server DB integer ID)
+    // 3. Content signature: sender|time|snippet
+    const existingMsgRows = document.querySelectorAll('#chatMessages .message-row');
+    const existingIdMap = new Map();
+    const existingSigMap = new Map();
+
+    existingMsgRows.forEach(row => {
+      const mId = row.dataset.msgId;
+      const dbId = row.dataset.dbId;
+      if (mId) existingIdMap.set(String(mId), row);
+      if (dbId) existingIdMap.set(String(dbId), row);
+
+      const senderType = row.classList.contains('outgoing') ? 'outgoing' : 'incoming';
+      const timeEl = row.querySelector('.message-time');
+      const timeStr = timeEl ? timeEl.textContent.trim() : '';
+      const textEl = row.querySelector('.bubble-text-content') || row.querySelector('.bubble');
+      let textSnippet = '';
+      if (textEl) {
+        const clone = textEl.cloneNode(true);
+        clone.querySelectorAll('.seen-dot, .reply-quote-chip').forEach(el => el.remove());
+        textSnippet = clone.textContent.trim().substring(0, 40);
+      }
+      if (textSnippet || timeStr) {
+        const sig = `${senderType}|${timeStr}|${textSnippet}`;
+        existingSigMap.set(sig, row);
+      }
     });
 
     let appendedAny = false;
     let hadIncoming = false;
 
     for (const msg of data.messages) {
-      const msgIdStr = String(msg.id);
+      const dbIdStr = String(msg.id);
+      const clientMsgIdStr = msg.client_msg_id ? String(msg.client_msg_id) : null;
       const isOutgoing = msg.sender === userKey;
       const type = isOutgoing ? 'outgoing' : 'incoming';
       const timeStr = msg.client_time || formatTimeFromIso(msg.created_at);
@@ -382,15 +424,32 @@ async function loadChatHistory(userKey) {
         hadIncoming = true;
       }
 
-      if (existingMsgIds.has(msgIdStr)) {
-        if (isOutgoing && isSeen) {
-          const row = document.querySelector(`#chatMessages .message-row[data-msg-id="${msgIdStr}"]`);
-          if (row) {
-            const dot = row.querySelector('.seen-dot');
-            if (dot) {
-              dot.classList.add('is-seen');
-              dot.setAttribute('title', 'Seen');
-            }
+      // Check if this message already exists in DOM
+      let matchingRow = null;
+      if (clientMsgIdStr && existingIdMap.has(clientMsgIdStr)) {
+        matchingRow = existingIdMap.get(clientMsgIdStr);
+      } else if (existingIdMap.has(dbIdStr)) {
+        matchingRow = existingIdMap.get(dbIdStr);
+      } else {
+        const textContent = msg.text_content || '';
+        const textSnippet = msg.msg_type === 'chat' ? textContent.trim().substring(0, 40) : '';
+        const sig = `${type}|${timeStr}|${textSnippet}`;
+        if (textSnippet && existingSigMap.has(sig)) {
+          matchingRow = existingSigMap.get(sig);
+        }
+      }
+
+      if (matchingRow) {
+        // Message already exists in DOM: cleanly sync DB id and seen status without re-appending!
+        matchingRow.dataset.dbId = dbIdStr;
+        if (clientMsgIdStr && !matchingRow.dataset.msgId) {
+          matchingRow.dataset.msgId = clientMsgIdStr;
+        }
+        if (isOutgoing) {
+          const dot = matchingRow.querySelector('.seen-dot');
+          if (dot) {
+            dot.classList.toggle('is-seen', isSeen);
+            dot.setAttribute('title', isSeen ? 'Seen' : 'Sent');
           }
         }
         continue;
@@ -403,17 +462,25 @@ async function loadChatHistory(userKey) {
         } catch (_) {}
       }
 
+      const assignedMsgId = clientMsgIdStr || ('msg_' + dbIdStr);
+
       if (msg.msg_type === 'chat') {
-        appendMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true, replyToData);
+        appendMessage(msg.text_content, type, timeStr, assignedMsgId, isSeen, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'voice' && msg.text_content) {
-        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, msgIdStr, null, isSeen, true, replyToData);
+        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, isSeen, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'image' && msg.text_content) {
-        appendImageMessage(msg.text_content, type, timeStr, msgIdStr, isSeen, true, replyToData);
+        appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, isSeen, true, replyToData);
         appendedAny = true;
       }
-      existingMsgIds.add(msgIdStr);
+
+      const newlyCreatedRow = document.querySelector(`#chatMessages .message-row[data-msg-id="${assignedMsgId}"]`);
+      if (newlyCreatedRow) {
+        newlyCreatedRow.dataset.dbId = dbIdStr;
+        existingIdMap.set(assignedMsgId, newlyCreatedRow);
+        existingIdMap.set(dbIdStr, newlyCreatedRow);
+      }
     }
 
     if (appendedAny) {
@@ -536,10 +603,13 @@ function wsSend(payload, shouldQueue = false) {
 function handleWsMessage(msg) {
   switch (msg.type) {
 
-    // ── Presence ──────────────────────────────────
+    // ── Presence & Pong Heartbeat ─────────────────
     case 'presence':
-      if (msg.user === currentPartner.key) {
-        isOpponentOnline = msg.status === 'online';
+    case 'pong':
+      if (!msg.user || msg.user === currentPartner.key) {
+        if (msg.status !== undefined) {
+          isOpponentOnline = msg.status === 'online';
+        }
         if (msg.last_seen) {
           opponentLastSeen = msg.last_seen;
         }
@@ -601,7 +671,14 @@ function handleWsMessage(msg) {
 function formatLastSeen(isoString) {
   if (!isoString) return 'Offline';
   try {
-    const cleanStr = isoString.includes('T') ? isoString : isoString.replace(' ', 'T') + 'Z';
+    let cleanStr = String(isoString).trim();
+    if (!cleanStr) return 'Offline';
+    if (!cleanStr.includes('T') && cleanStr.includes(' ')) {
+      cleanStr = cleanStr.replace(' ', 'T') + 'Z';
+    } else if (!cleanStr.endsWith('Z') && !cleanStr.includes('+')) {
+      cleanStr = cleanStr + 'Z';
+    }
+
     const date = new Date(cleanStr);
     if (isNaN(date.getTime())) return 'Offline';
 
@@ -610,9 +687,9 @@ function formatLastSeen(isoString) {
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
 
-    // If within 45 seconds
-    if (diffSec < 45) {
-      return 'Last seen just now';
+    // If within 40 seconds
+    if (diffSec < 40) {
+      return 'Active just now';
     }
 
     // Format local time (e.g. 10:45 PM)
@@ -625,7 +702,7 @@ function formatLastSeen(isoString) {
     const timeStr = `${hours}:${strMinutes} ${ampm}`;
 
     if (diffMin < 60) {
-      return `Last seen ${diffMin}m ago`;
+      return `Active ${diffMin}m ago`;
     }
 
     const isToday = now.toDateString() === date.toDateString();
@@ -684,7 +761,7 @@ setInterval(() => {
   if (activeUser && !isOpponentOnline && !opponentTyping && userStatusEl && opponentLastSeen) {
     userStatusEl.textContent = formatLastSeen(opponentLastSeen);
   }
-}, 25000);
+}, 12000);
 
 // ─────────────────────────────────────────────────
 //  Typing Indicators & Snappy Live Keystroke Stream
@@ -2916,4 +2993,47 @@ function sendFlyingEmojiBalloon(emojiChar) {
   // 3. Keep virtual keyboard open and input focused
   keepInputFocused();
 }
+
+// ─────────────────────────────────────────────────
+//  App Visibility, Focus & Connection Keep-Alive
+// ─────────────────────────────────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (activeUser) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.log('[App] Tab resumed — reconnecting WebSocket...');
+        connectWebSocket(activeUser);
+      } else {
+        wsSend({ type: 'ping' });
+      }
+      loadChatHistory(activeUser);
+      refreshOpponentPresence();
+    }
+  }
+});
+
+window.addEventListener('focus', () => {
+  if (activeUser) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      connectWebSocket(activeUser);
+    }
+    loadChatHistory(activeUser);
+    refreshOpponentPresence();
+  }
+});
+
+window.addEventListener('online', () => {
+  if (activeUser) {
+    connectWebSocket(activeUser);
+    loadChatHistory(activeUser);
+    refreshOpponentPresence();
+  }
+});
+
+// Periodic keep-alive heartbeat ping every 20s
+setInterval(() => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    wsSend({ type: 'ping' });
+  }
+}, 20000);
 
