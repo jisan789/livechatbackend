@@ -889,12 +889,47 @@ function clearChatDOM() {
 // ─────────────────────────────────────────────────
 //  Swipe to Reply & Quoted Message Management
 // ─────────────────────────────────────────────────
-//  External Cross-Platform Emoji Engine (Twemoji 15)
+//  External Cross-Platform Emoji Engine (Apple HD Retina Color Emoji)
 // ─────────────────────────────────────────────────
-const TWEMOJI_OPTIONS = {
-  folder: 'svg',
-  ext: '.svg',
-  base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/'
+const APPLE_EMOJI_BASE = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
+const TWEMOJI_FALLBACK_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/';
+
+/**
+ * Normalizes unicode hex codepoints produced by the parser to match Apple Emoji datasource assets.
+ */
+function resolveAppleEmojiUrl(icon) {
+  if (!icon) return '';
+  let cleanIcon = icon.toLowerCase().trim();
+
+  // Normalize common heart and basic symbol variation selectors for Apple dataset
+  if (!cleanIcon.includes('-fe0f')) {
+    if (['2764', '2600', '2601', '2614', '26a1', '26bd', '26c4', '26a0', '2702', '2708', '2709', '270f', '2712', '2714', '2716', '2721', '2733', '2734', '2744', '2747'].includes(cleanIcon)) {
+      cleanIcon = `${cleanIcon}-fe0f`;
+    }
+  }
+
+  // Handle heart on fire and composite ZWJ sequences
+  if (cleanIcon === '2764-200d-1f525') {
+    cleanIcon = '2764-fe0f-200d-1f525';
+  } else if (cleanIcon.includes('-200d-') && !cleanIcon.includes('fe0f')) {
+    const parts = cleanIcon.split('-200d-');
+    cleanIcon = parts.map(p => (p.length === 4 && ['2764', '2600', '2640', '2642', '2695', '2696', '2708'].includes(p)) ? `${p}-fe0f` : p).join('-200d-');
+  }
+
+  return `${APPLE_EMOJI_BASE}${cleanIcon}.png`;
+}
+
+const EMOJI_RENDER_OPTIONS = {
+  callback: (icon, options) => {
+    return resolveAppleEmojiUrl(icon);
+  },
+  attributes: (icon, variant) => {
+    return {
+      loading: 'lazy',
+      decoding: 'async',
+      draggable: 'false'
+    };
+  }
 };
 
 function renderEmojiHtml(rawText) {
@@ -902,7 +937,7 @@ function renderEmojiHtml(rawText) {
   const escaped = escapeHtml(rawText);
   if (window.twemoji && typeof window.twemoji.parse === 'function') {
     try {
-      return window.twemoji.parse(escaped, TWEMOJI_OPTIONS);
+      return window.twemoji.parse(escaped, EMOJI_RENDER_OPTIONS);
     } catch (e) {
       return escaped;
     }
@@ -914,9 +949,9 @@ function parseEmojisInDOM(rootEl) {
   if (!rootEl) return;
   if (window.twemoji && typeof window.twemoji.parse === 'function') {
     try {
-      window.twemoji.parse(rootEl, TWEMOJI_OPTIONS);
+      window.twemoji.parse(rootEl, EMOJI_RENDER_OPTIONS);
     } catch (e) {
-      console.warn('[Twemoji] DOM parse error:', e);
+      console.warn('[EmojiEngine] DOM parse error:', e);
     }
   }
 }
