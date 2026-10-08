@@ -673,71 +673,95 @@ function handleWsMessage(msg) {
 //  Presence UI & Last Seen Formatting
 // ─────────────────────────────────────────────────
 function formatLastSeen(isoString) {
-  if (!isoString) return 'Offline';
-  try {
-    let cleanStr = String(isoString).trim();
-    if (!cleanStr) return 'Offline';
-    if (!cleanStr.includes('T') && cleanStr.includes(' ')) {
-      cleanStr = cleanStr.replace(' ', 'T') + 'Z';
-    } else if (!cleanStr.endsWith('Z') && !cleanStr.includes('+')) {
-      cleanStr = cleanStr + 'Z';
-    }
+  let dateObj = null;
 
-    const date = new Date(cleanStr);
-    if (isNaN(date.getTime())) return 'Offline';
-
-    const now = new Date();
-    const diffMs = Math.max(0, now.getTime() - date.getTime());
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-
-    // If within 40 seconds
-    if (diffSec < 40) {
-      return 'Active just now';
-    }
-
-    // Format local time (e.g. 10:45 PM)
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    const strMinutes = minutes < 10 ? '0' + minutes : minutes;
-    const timeStr = `${hours}:${strMinutes} ${ampm}`;
-
-    if (diffMin < 60) {
-      return `Active ${diffMin}m ago`;
-    }
-
-    const isToday = now.toDateString() === date.toDateString();
-    if (isToday) {
-      return `Last seen today at ${timeStr}`;
-    }
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = yesterday.toDateString() === date.toDateString();
-    if (isYesterday) {
-      return `Last seen yesterday at ${timeStr}`;
-    }
-
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[date.getMonth()];
-    const day = date.getDate();
-
-    if (now.getFullYear() === date.getFullYear()) {
-      return `Last seen ${month} ${day} at ${timeStr}`;
-    }
-
-    return `Last seen ${month} ${day}, ${date.getFullYear()}`;
-  } catch (e) {
-    return 'Offline';
+  if (isoString) {
+    try {
+      let cleanStr = String(isoString).trim();
+      if (!cleanStr.includes('T') && cleanStr.includes(' ')) {
+        cleanStr = cleanStr.replace(' ', 'T') + 'Z';
+      } else if (!cleanStr.endsWith('Z') && !cleanStr.includes('+')) {
+        cleanStr = cleanStr + 'Z';
+      }
+      const parsed = new Date(cleanStr);
+      if (!isNaN(parsed.getTime())) {
+        dateObj = parsed;
+      }
+    } catch (_) {}
   }
+
+  // Fallback to local storage cached last seen
+  if (!dateObj && currentPartner && currentPartner.key) {
+    try {
+      const cached = localStorage.getItem('chat_last_seen_' + currentPartner.key);
+      if (cached) {
+        const parsed = new Date(cached);
+        if (!isNaN(parsed.getTime())) dateObj = parsed;
+      }
+    } catch (_) {}
+  }
+
+  // Fallback to last bubble time in chat DOM or recent timestamp
+  if (!dateObj) {
+    const lastTimeEl = document.querySelector('#chatMessages .message-row:last-child .bubble-time');
+    if (lastTimeEl && lastTimeEl.textContent.trim()) {
+      return `Last active at ${lastTimeEl.textContent.trim()}`;
+    }
+    dateObj = new Date();
+  }
+
+  const now = new Date();
+  const diffMs = Math.max(0, now.getTime() - dateObj.getTime());
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+
+  // Format 12-hour local time (e.g. 10:45 PM)
+  let hours = dateObj.getHours();
+  const minutes = dateObj.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+  const timeStr = `${hours}:${strMinutes} ${ampm}`;
+
+  if (diffSec < 45) {
+    return `Last active just now (${timeStr})`;
+  }
+
+  if (diffMin < 60) {
+    return `Last active at ${timeStr} (${diffMin}m ago)`;
+  }
+
+  const isToday = now.toDateString() === dateObj.toDateString();
+  if (isToday) {
+    return `Last active today at ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = yesterday.toDateString() === dateObj.toDateString();
+  if (isYesterday) {
+    return `Last active yesterday at ${timeStr}`;
+  }
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[dateObj.getMonth()];
+  const day = dateObj.getDate();
+
+  if (now.getFullYear() === dateObj.getFullYear()) {
+    return `Last active ${month} ${day} at ${timeStr}`;
+  }
+
+  return `Last active ${month} ${day}, ${dateObj.getFullYear()} at ${timeStr}`;
 }
 
 function setPresenceUI(online, lastSeen = null) {
   if (lastSeen !== null && lastSeen !== undefined) {
     opponentLastSeen = lastSeen;
+    if (currentPartner && currentPartner.key) {
+      try {
+        localStorage.setItem('chat_last_seen_' + currentPartner.key, String(lastSeen));
+      } catch (_) {}
+    }
   }
   const badge = avatarBadge || document.getElementById('avatarBadge') || document.querySelector('.avatar-badge');
   if (badge) {
@@ -756,16 +780,23 @@ function setPresenceUI(online, lastSeen = null) {
 
 function setPresenceOffline(lastSeen = null) {
   isOpponentOnline = false;
-  if (lastSeen) opponentLastSeen = lastSeen;
+  if (lastSeen) {
+    opponentLastSeen = lastSeen;
+    if (currentPartner && currentPartner.key) {
+      try {
+        localStorage.setItem('chat_last_seen_' + currentPartner.key, String(lastSeen));
+      } catch (_) {}
+    }
+  }
   setPresenceUI(false, opponentLastSeen);
 }
 
 // Keep relative last seen times updated automatically
 setInterval(() => {
-  if (activeUser && !isOpponentOnline && !opponentTyping && userStatusEl && opponentLastSeen) {
+  if (activeUser && !isOpponentOnline && !opponentTyping && userStatusEl) {
     userStatusEl.textContent = formatLastSeen(opponentLastSeen);
   }
-}, 12000);
+}, 10000);
 
 // ─────────────────────────────────────────────────
 //  Typing Indicators & Snappy Live Keystroke Stream
@@ -887,73 +918,15 @@ function clearChatDOM() {
 }
 
 // ─────────────────────────────────────────────────
-//  Swipe to Reply & Quoted Message Management
+//  Native Static Emoji Engine (Instant & Zero-Lag)
 // ─────────────────────────────────────────────────
-//  External Cross-Platform Emoji Engine (Apple HD Retina Color Emoji)
-// ─────────────────────────────────────────────────
-const APPLE_EMOJI_BASE = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
-const TWEMOJI_FALLBACK_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/';
-
-/**
- * Normalizes unicode hex codepoints produced by the parser to match Apple Emoji datasource assets.
- */
-function resolveAppleEmojiUrl(icon) {
-  if (!icon) return '';
-  let cleanIcon = icon.toLowerCase().trim();
-
-  // Normalize common heart and basic symbol variation selectors for Apple dataset
-  if (!cleanIcon.includes('-fe0f')) {
-    if (['2764', '2600', '2601', '2614', '26a1', '26bd', '26c4', '26a0', '2702', '2708', '2709', '270f', '2712', '2714', '2716', '2721', '2733', '2734', '2744', '2747'].includes(cleanIcon)) {
-      cleanIcon = `${cleanIcon}-fe0f`;
-    }
-  }
-
-  // Handle heart on fire and composite ZWJ sequences
-  if (cleanIcon === '2764-200d-1f525') {
-    cleanIcon = '2764-fe0f-200d-1f525';
-  } else if (cleanIcon.includes('-200d-') && !cleanIcon.includes('fe0f')) {
-    const parts = cleanIcon.split('-200d-');
-    cleanIcon = parts.map(p => (p.length === 4 && ['2764', '2600', '2640', '2642', '2695', '2696', '2708'].includes(p)) ? `${p}-fe0f` : p).join('-200d-');
-  }
-
-  return `${APPLE_EMOJI_BASE}${cleanIcon}.png`;
-}
-
-const EMOJI_RENDER_OPTIONS = {
-  callback: (icon, options) => {
-    return resolveAppleEmojiUrl(icon);
-  },
-  attributes: (icon, variant) => {
-    return {
-      loading: 'lazy',
-      decoding: 'async',
-      draggable: 'false'
-    };
-  }
-};
-
 function renderEmojiHtml(rawText) {
   if (!rawText) return '';
-  const escaped = escapeHtml(rawText);
-  if (window.twemoji && typeof window.twemoji.parse === 'function') {
-    try {
-      return window.twemoji.parse(escaped, EMOJI_RENDER_OPTIONS);
-    } catch (e) {
-      return escaped;
-    }
-  }
-  return escaped;
+  return escapeHtml(rawText);
 }
 
 function parseEmojisInDOM(rootEl) {
-  if (!rootEl) return;
-  if (window.twemoji && typeof window.twemoji.parse === 'function') {
-    try {
-      window.twemoji.parse(rootEl, EMOJI_RENDER_OPTIONS);
-    } catch (e) {
-      console.warn('[EmojiEngine] DOM parse error:', e);
-    }
-  }
+  // Static native emojis — zero DOM manipulation, zero network lag
 }
 
 function isOnlyEmojis(text) {

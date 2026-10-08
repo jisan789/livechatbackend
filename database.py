@@ -170,7 +170,10 @@ def get_user_last_seen(user_key: str) -> Optional[str]:
                 return str(msg_row["created_at"])
     except Exception as e:
         logger.error(f"[DB] Error getting user last seen for {user_key}: {e}")
-    return None
+
+    # Fallback to current UTC timestamp so a specific time is always available
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def save_message(
