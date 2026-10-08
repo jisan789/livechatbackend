@@ -113,6 +113,10 @@ window.addEventListener('DOMContentLoaded', () => {
   setupKeyboardUIHandling();
   preloadKeypressSounds();
 
+  // Parse external vector emojis for popover grid and UI
+  const popover = document.getElementById('emojiPopover');
+  if (popover) parseEmojisInDOM(popover);
+
   const saved = sessionStorage.getItem('chat_active_user');
   if (saved && USER_PROFILES[saved]) {
     loginUser(saved);
@@ -824,7 +828,14 @@ function handleOpponentLiveTyping(text) {
 
   const textNode = currentLiveIncomingRow.querySelector('.streaming-text');
   if (textNode) {
-    textNode.textContent = text;
+    if (isOnlyEmojis(text)) {
+      const cnt = getEmojiCount(text);
+      textNode.classList.add('only-emojis');
+      if (cnt === 1) textNode.classList.add('only-single-emoji');
+    } else {
+      textNode.classList.remove('only-emojis', 'only-single-emoji');
+    }
+    textNode.innerHTML = renderEmojiHtml(text);
     playOpponentLiveSound();
     scrollToBottom();
   }
@@ -878,6 +889,69 @@ function clearChatDOM() {
 // ─────────────────────────────────────────────────
 //  Swipe to Reply & Quoted Message Management
 // ─────────────────────────────────────────────────
+//  External Cross-Platform Emoji Engine (Twemoji 15)
+// ─────────────────────────────────────────────────
+const TWEMOJI_OPTIONS = {
+  folder: 'svg',
+  ext: '.svg',
+  base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/'
+};
+
+function renderEmojiHtml(rawText) {
+  if (!rawText) return '';
+  const escaped = escapeHtml(rawText);
+  if (window.twemoji && typeof window.twemoji.parse === 'function') {
+    try {
+      return window.twemoji.parse(escaped, TWEMOJI_OPTIONS);
+    } catch (e) {
+      return escaped;
+    }
+  }
+  return escaped;
+}
+
+function parseEmojisInDOM(rootEl) {
+  if (!rootEl) return;
+  if (window.twemoji && typeof window.twemoji.parse === 'function') {
+    try {
+      window.twemoji.parse(rootEl, TWEMOJI_OPTIONS);
+    } catch (e) {
+      console.warn('[Twemoji] DOM parse error:', e);
+    }
+  }
+}
+
+function isOnlyEmojis(text) {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  try {
+    const emojiOnlyRegex = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\u200D|\uFE0F|\uFE0E|\u{1F3FB}-\u{1F3FF}|\u{E0020}-\u{E007F}|\s)+$/u;
+    if (!emojiOnlyRegex.test(trimmed)) return false;
+    if (window.Intl && Intl.Segmenter) {
+      const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+      const segments = Array.from(segmenter.segment(trimmed)).filter(s => s.segment.trim().length > 0);
+      return segments.length >= 1 && segments.length <= 4;
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function getEmojiCount(text) {
+  if (!text) return 0;
+  const trimmed = text.trim();
+  if (window.Intl && Intl.Segmenter) {
+    try {
+      const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+      const segments = Array.from(segmenter.segment(trimmed)).filter(s => s.segment.trim().length > 0);
+      return segments.length;
+    } catch (_) {}
+  }
+  return trimmed.length > 0 ? 1 : 0;
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -903,7 +977,7 @@ function setReplyContext(replyObj) {
     } else if (replyObj.msg_type === 'image') {
       previewText = '📷 Photo';
     }
-    replyPreviewText.textContent = previewText || 'Message';
+    replyPreviewText.innerHTML = renderEmojiHtml(previewText || 'Message');
 
     if (replyPreviewThumbWrapper && replyPreviewThumb) {
       if (replyObj.msg_type === 'image' && (replyObj.image || replyObj.imageUrl)) {
@@ -955,7 +1029,7 @@ function createReplyQuoteElement(replyTo) {
     <div class="reply-quote-line"></div>
     <div class="reply-quote-inner">
       <div class="reply-quote-sender">${escapeHtml(senderName)}</div>
-      <div class="reply-quote-snippet">${escapeHtml(snippet)}</div>
+      <div class="reply-quote-snippet">${renderEmojiHtml(snippet)}</div>
     </div>
   `;
 
@@ -1165,7 +1239,16 @@ function receiveIncomingMessage(text, timeStr, messageId = null, replyTo = null)
     const textNode = currentLiveIncomingRow.querySelector('.streaming-text');
     const cursorNode = currentLiveIncomingRow.querySelector('.streaming-cursor');
 
-    if (textNode) textNode.textContent = text;
+    if (textNode) {
+      if (isOnlyEmojis(text)) {
+        const cnt = getEmojiCount(text);
+        textNode.classList.add('only-emojis');
+        if (cnt === 1) textNode.classList.add('only-single-emoji');
+      } else {
+        textNode.classList.remove('only-emojis', 'only-single-emoji');
+      }
+      textNode.innerHTML = renderEmojiHtml(text);
+    }
     if (cursorNode) cursorNode.remove();
     if (bubble) bubble.classList.remove('live-typing-bubble');
 
@@ -1271,7 +1354,12 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
 
   const textSpan = document.createElement('span');
   textSpan.className = 'bubble-text-content';
-  textSpan.textContent = content;
+  if (isOnlyEmojis(content)) {
+    const cnt = getEmojiCount(content);
+    textSpan.classList.add('only-emojis');
+    if (cnt === 1) textSpan.classList.add('only-single-emoji');
+  }
+  textSpan.innerHTML = renderEmojiHtml(content);
   bubble.appendChild(textSpan);
 
   if (type === 'outgoing') {
@@ -2407,11 +2495,10 @@ function setupEventListeners() {
           e.preventDefault();
           e.stopPropagation();
         }
-        const now = Date.now();
-        if (now - lastEmojiSendTime < 300) return;
-        lastEmojiSendTime = now;
-
-        sendFlyingEmojiBalloon(btn.textContent.trim());
+        const emojiChar = btn.dataset.emoji || btn.getAttribute('data-emoji') || (btn.querySelector('img.emoji')?.alt) || btn.textContent.trim();
+        if (emojiChar) {
+          sendFlyingEmojiBalloon(emojiChar);
+        }
         if (chatInput) chatInput.focus({ preventScroll: true });
       };
 
@@ -2954,10 +3041,10 @@ function createFlyingBalloon(emojiChar) {
       balloon.style.setProperty('--rot-4', `${rot4}deg`);
 
       const hasSparkleBadge = (isLead || Math.random() < 0.25);
-      const sparkleBadgeHtml = hasSparkleBadge ? `<span class="balloon-sparkle" aria-hidden="true">✨</span>` : '';
+      const sparkleBadgeHtml = hasSparkleBadge ? `<span class="balloon-sparkle" aria-hidden="true">${renderEmojiHtml('✨')}</span>` : '';
 
       balloon.innerHTML = `
-        <span class="balloon-emoji" aria-hidden="true">${chosenChar}</span>
+        <span class="balloon-emoji" aria-hidden="true">${renderEmojiHtml(chosenChar)}</span>
         ${sparkleBadgeHtml}
         <div class="balloon-string" aria-hidden="true"></div>
       `;

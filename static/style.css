@@ -1035,14 +1035,15 @@ button, input, textarea, select {
   border: none;
   font-size: 22px;
   font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
-  padding: 4px;
-  border-radius: 8px;
+  padding: 5px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.12s ease, background 0.12s ease;
-  line-height: 1.1;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.12s ease;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 38px;
 }
 
 .emoji-btn:hover {
@@ -1052,6 +1053,19 @@ button, input, textarea, select {
 
 .emoji-btn:active {
   transform: scale(0.92);
+}
+
+.emoji-btn img.emoji {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  margin: 0;
+  vertical-align: middle;
+  transition: transform 0.15s ease;
+}
+
+.emoji-btn:hover img.emoji {
+  transform: scale(1.15);
 }
 
 .emoji-btn.keyword-pulse {
@@ -1816,3 +1830,83 @@ button, input, textarea, select {
     filter: brightness(1);
   }
 }
+
+/* ══════════════════════════════════════════════════
+   EXTERNAL TWEMOJI CROSS-PLATFORM STYLING
+   ══════════════════════════════════════════════════ */
+img.emoji {
+  height: 1.25em;
+  width: 1.25em;
+  margin: 0 0.12em;
+  vertical-align: -0.22em;
+  display: inline-block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* Large Standalone Emoji Bubbles */
+.bubble-text-content.only-emojis {
+  font-size: 1.8rem;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bubble-text-content.only-emojis img.emoji {
+  height: 2.5rem;
+  width: 2.5rem;
+  margin: 2px 3px;
+  vertical-align: middle;
+}
+
+.bubble-text-content.only-single-emoji {
+  font-size: 2.8rem;
+}
+
+.bubble-text-content.only-single-emoji img.emoji {
+  height: 3.4rem;
+  width: 3.4rem;
+  margin: 2px;
+}
+
+/* Flying Balloon Twemoji Vector Graphics */
+.balloon-emoji img.emoji {
+  width: var(--balloon-size, 36px);
+  height: var(--balloon-size, 36px);
+  max-width: 58px;
+  max-height: 58px;
+  object-fit: contain;
+  margin: 0;
+  vertical-align: middle;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
+}
+
+.balloon-sparkle img.emoji {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* Streaming live typing emoji sizing */
+.streaming-text img.emoji {
+  height: 1.2em;
+  width: 1.2em;
+  vertical-align: -0.18em;
+}
+
+/* Reply Preview and Quote Chips */
+.reply-preview-text img.emoji,
+.reply-quote-snippet img.emoji {
+  height: 1.15em;
+  width: 1.15em;
+  margin: 0 0.08em;
+  vertical-align: -0.16em;
+}
+
