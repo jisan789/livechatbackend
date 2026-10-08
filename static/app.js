@@ -314,7 +314,11 @@ function showChatsList() {
   currentView = 'chats';
   if (chatApp) {
     chatApp.classList.remove('in-chat');
+    chatApp.scrollLeft = 0;
   }
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollLeft = 0;
+  window.scrollTo(0, 0);
   document.title = 'LiveChat — Chats';
   updateChatsListCardUI();
 }
@@ -323,7 +327,10 @@ function openConversation() {
   currentView = 'conversation';
   if (chatApp) {
     chatApp.classList.add('in-chat');
+    chatApp.scrollLeft = 0;
   }
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollLeft = 0;
   if (currentPartner && currentPartner.name) {
     document.title = `LiveChat — ${currentPartner.name}`;
   }
@@ -1148,11 +1155,12 @@ function createReplyQuoteElement(replyTo) {
 
   quoteEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!targetId) return;
+    if (!targetId || !chatMessages) return;
     const targetRow = document.querySelector(`#chatMessages .message-row[data-msg-id="${targetId}"]`) ||
                       document.querySelector(`#chatMessages .message-row[data-db-id="${targetId}"]`);
     if (targetRow) {
-      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const targetOffset = targetRow.offsetTop - (chatMessages.clientHeight / 2) + (targetRow.clientHeight / 2);
+      chatMessages.scrollTo({ top: Math.max(0, targetOffset), behavior: 'smooth' });
       targetRow.classList.add('message-highlight-pulse');
       setTimeout(() => targetRow.classList.remove('message-highlight-pulse'), 1600);
     } else {
@@ -1519,49 +1527,14 @@ function scrollToBottom(forceInstant = false) {
   if (!chatMessages) return;
 
   const performScroll = () => {
-    // 1. Direct scroll to max scroll position
     chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    // 2. Anchor scroll into view to guarantee visibility above footer
-    const bottomAnchor = document.getElementById('chatBottomAnchor');
-    if (bottomAnchor && typeof bottomAnchor.scrollIntoView === 'function') {
-      try {
-        bottomAnchor.scrollIntoView({
-          behavior: forceInstant ? 'instant' : 'auto',
-          block: 'end',
-          inline: 'nearest'
-        });
-        return;
-      } catch (e) {
-        // Fallback
-      }
-    }
-
-    // 3. Fallback to scrolling the last message row into view
-    const messageRows = chatMessages.querySelectorAll('.message-row');
-    if (messageRows.length > 0) {
-      const lastRow = messageRows[messageRows.length - 1];
-      if (lastRow && typeof lastRow.scrollIntoView === 'function') {
-        try {
-          lastRow.scrollIntoView({
-            behavior: forceInstant ? 'instant' : 'auto',
-            block: 'end',
-            inline: 'nearest'
-          });
-        } catch (e) {
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      }
-    }
   };
 
   // Immediate synchronous scroll
   performScroll();
 
   // Re-scroll on next animation frame after layout/repaint
-  requestAnimationFrame(() => {
-    performScroll();
-  });
+  requestAnimationFrame(performScroll);
 
   // Timed passes for virtual keyboards, dynamic font rendering, and reflow
   setTimeout(performScroll, 30);

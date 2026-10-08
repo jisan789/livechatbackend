@@ -147,7 +147,7 @@ button, input, textarea, select {
   width: 100%;
   height: 100%;
   background: rgba(248, 250, 252, 0.96);
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease, visibility 0.28s;
   overflow: hidden;
 }
 
@@ -155,6 +155,7 @@ button, input, textarea, select {
   z-index: 2;
   transform: translateX(0);
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -162,18 +163,21 @@ button, input, textarea, select {
   z-index: 3;
   transform: translateX(100%);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
 .chat-app.in-chat .chats-screen {
   transform: translateX(-20%);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
 .chat-app.in-chat .conversation-screen {
   transform: translateX(0);
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
