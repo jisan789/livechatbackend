@@ -7,13 +7,18 @@
   --text-secondary: #64748B;
   --text-muted: #94A3B8;
   
-  /* Apple System Blue & Clean Tokens */
-  --apple-blue: #007AFF;
-  --apple-blue-dark: #0062D2;
-  --apple-blue-glow: rgba(0, 122, 255, 0.25);
+  /* Apple Purple & Clean Tokens */
+  --apple-purple: #8B5CF6;
+  --apple-purple-dark: #7C3AED;
+  --apple-purple-glow: rgba(139, 92, 246, 0.28);
+  
+  /* Theme aliases */
+  --apple-blue: #8B5CF6;
+  --apple-blue-dark: #7C3AED;
+  --apple-blue-glow: rgba(139, 92, 246, 0.28);
   
   --bubble-incoming-bg: #FFFFFF;
-  --bubble-outgoing-bg: linear-gradient(180deg, #007AFF 0%, #0066DB 100%);
+  --bubble-outgoing-bg: linear-gradient(180deg, #8B5CF6 0%, #7C3AED 100%);
   --danger-color: #EF4444;
 }
 
@@ -66,7 +71,7 @@ button, input, textarea, select {
   left: 20%;
   width: 450px;
   height: 450px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, rgba(14, 165, 233, 0.08) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.38) 0%, rgba(139, 92, 246, 0.08) 60%, transparent 75%);
 }
 
 .desktop-wallpaper-glow--2 {
@@ -74,7 +79,7 @@ button, input, textarea, select {
   right: 15%;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, rgba(129, 140, 248, 0.08) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.32) 0%, rgba(192, 132, 252, 0.08) 60%, transparent 75%);
 }
 
 .desktop-wallpaper-glow--3 {
@@ -275,8 +280,8 @@ button, input, textarea, select {
 
 .chats-search-pill:focus-within {
   background: #FFFFFF;
-  border-color: #007AFF;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
 }
 
 .chats-search-icon {
@@ -334,8 +339,8 @@ button, input, textarea, select {
 }
 
 .chats-count-badge {
-  background: rgba(0, 122, 255, 0.1);
-  color: #007AFF;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8B5CF6;
   font-size: 11px;
   font-weight: 700;
   padding: 1px 7px;
@@ -370,7 +375,7 @@ button, input, textarea, select {
   background: #FFFFFF;
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
-  border-color: rgba(0, 122, 255, 0.35);
+  border-color: rgba(139, 92, 246, 0.35);
 }
 
 .chat-list-card:active {
@@ -470,7 +475,7 @@ button, input, textarea, select {
 }
 
 .chat-card-preview.is-typing {
-  color: #007AFF;
+  color: #8B5CF6;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -481,7 +486,7 @@ button, input, textarea, select {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #007AFF;
+  background: #8B5CF6;
   flex-shrink: 0;
 }
 
@@ -493,7 +498,7 @@ button, input, textarea, select {
 
 .chat-list-card:hover .chat-card-chevron {
   transform: translateX(2px);
-  color: #007AFF;
+  color: #8B5CF6;
 }
 
 .chats-empty-state {
@@ -537,9 +542,9 @@ button, input, textarea, select {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  background: rgba(0, 122, 255, 0.08);
-  border: 1px solid rgba(0, 122, 255, 0.2);
-  color: #007AFF;
+  background: rgba(139, 92, 246, 0.09);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  color: #8B5CF6;
   font-size: 13px;
   font-weight: 600;
   padding: 5px 8px 5px 4px;
@@ -553,7 +558,7 @@ button, input, textarea, select {
 }
 
 .chat-back-btn:hover {
-  background: rgba(0, 122, 255, 0.16);
+  background: rgba(139, 92, 246, 0.18);
   transform: translateX(-2px);
 }
 
@@ -668,7 +673,7 @@ button, input, textarea, select {
 }
 
 .user-status.is-typing {
-  color: #007AFF;
+  color: #8B5CF6;
   font-weight: 600;
 }
 
@@ -712,7 +717,7 @@ button, input, textarea, select {
 
 .action-icon-btn:hover {
   background: #FFFFFF;
-  color: #007AFF;
+  color: #8B5CF6;
   transform: scale(1.05);
 }
 
@@ -738,7 +743,7 @@ button, input, textarea, select {
 }
 
 .tiny-external-btn:hover {
-  color: #007AFF;
+  color: #8B5CF6;
   transform: scale(1.06);
 }
 
@@ -855,8 +860,8 @@ button, input, textarea, select {
   color: #FFFFFF;
   border-radius: 18px 18px 4px 18px;
   padding-right: 18px;
-  box-shadow: 0 2px 8px -1px rgba(0, 122, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px -1px rgba(139, 92, 246, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 /* Incoming Bubble */
@@ -940,7 +945,7 @@ button, input, textarea, select {
 }
 
 .message-row.outgoing .bubble.image-bubble {
-  background: #007AFF;
+  background: #8B5CF6;
   border-radius: 18px 18px 4px 18px;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -993,7 +998,7 @@ button, input, textarea, select {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #007AFF;
+  background: #8B5CF6;
   border: none;
   outline: none;
   cursor: pointer;
@@ -1002,7 +1007,7 @@ button, input, textarea, select {
   justify-content: center;
   color: #FFFFFF;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.25);
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.28);
   transition: transform 0.12s ease;
 }
 
@@ -1047,7 +1052,7 @@ button, input, textarea, select {
 /* Outgoing Voice Message */
 .message-row.outgoing .voice-play-btn {
   background: #FFFFFF;
-  color: #007AFF;
+  color: #8B5CF6;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
@@ -1065,7 +1070,7 @@ button, input, textarea, select {
 
 /* Incoming Voice Message */
 .message-row.incoming .voice-play-btn {
-  background: #007AFF;
+  background: #8B5CF6;
   color: #FFFFFF;
 }
 
@@ -1074,7 +1079,7 @@ button, input, textarea, select {
 }
 
 .message-row.incoming .voice-waveform span.played {
-  background: #007AFF;
+  background: #8B5CF6;
 }
 
 /* ══════════════════════════════════════════════════
@@ -1108,7 +1113,7 @@ button, input, textarea, select {
   display: inline-block;
   width: 2px;
   height: 14px;
-  background: #007AFF;
+  background: #8B5CF6;
   margin-left: 2px;
   border-radius: 999px;
   vertical-align: -2px;
@@ -1158,7 +1163,7 @@ button, input, textarea, select {
   30% {
     transform: translateY(-3px);
     opacity: 1;
-    background: #007AFF;
+    background: #8B5CF6;
   }
 }
 
@@ -1203,8 +1208,8 @@ button, input, textarea, select {
 .input-pill:focus-within,
 .input-pill.focused {
   background: #FFFFFF;
-  border-color: #007AFF;
-  box-shadow: 0 0 0 2.5px rgba(0, 122, 255, 0.16);
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 2.5px rgba(139, 92, 246, 0.18);
 }
 
 .input-normal-content {
@@ -1233,7 +1238,7 @@ button, input, textarea, select {
 }
 
 .input-icon-btn:hover {
-  color: #007AFF;
+  color: #8B5CF6;
 }
 
 .chat-input {
@@ -1274,8 +1279,8 @@ button, input, textarea, select {
 }
 
 .send-btn.send-mode {
-  background: linear-gradient(180deg, #007AFF 0%, #0062D2 100%);
-  box-shadow: 0 3px 10px rgba(0, 122, 255, 0.35);
+  background: linear-gradient(180deg, #8B5CF6 0%, #7C3AED 100%);
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.38);
 }
 
 .send-btn:active, .mic-btn:active {
@@ -1420,9 +1425,9 @@ button, input, textarea, select {
 }
 
 .emoji-popover-action-btn:hover {
-  background: #007AFF;
+  background: #8B5CF6;
   color: #FFFFFF;
-  border-color: #007AFF;
+  border-color: #8B5CF6;
 }
 
 .emoji-popover-action-btn:active {
@@ -1995,24 +2000,24 @@ button, input, textarea, select {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(0, 122, 255, 0.14);
+  background: rgba(139, 92, 246, 0.15);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1.5px solid rgba(0, 122, 255, 0.35);
-  color: #007AFF;
+  border: 1.5px solid rgba(139, 92, 246, 0.38);
+  color: #8B5CF6;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(0, 122, 255, 0.2);
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.22);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .swipe-reply-indicator.ready .swipe-reply-icon-circle {
-  background: #007AFF;
-  border-color: #007AFF;
+  background: #8B5CF6;
+  border-color: #8B5CF6;
   color: #FFFFFF;
   transform: scale(1.15);
-  box-shadow: 0 5px 16px rgba(0, 122, 255, 0.45);
+  box-shadow: 0 5px 16px rgba(139, 92, 246, 0.48);
 }
 
 /* ── Reply Preview Bar above Bottom Input Bar ── */
@@ -2050,7 +2055,7 @@ button, input, textarea, select {
   top: 0;
   bottom: 0;
   width: 4px;
-  background: #007AFF;
+  background: #8B5CF6;
   border-radius: 4px 0 0 4px;
 }
 
@@ -2066,7 +2071,7 @@ button, input, textarea, select {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #007AFF;
+  color: #8B5CF6;
 }
 
 .reply-preview-icon {
@@ -2158,7 +2163,7 @@ button, input, textarea, select {
   top: 0;
   bottom: 0;
   width: 3.5px;
-  background: #007AFF;
+  background: #8B5CF6;
   border-radius: 4px 0 0 4px;
 }
 
@@ -2185,7 +2190,7 @@ button, input, textarea, select {
 .reply-quote-sender {
   font-size: 11.5px;
   font-weight: 700;
-  color: #007AFF;
+  color: #8B5CF6;
   line-height: 1.2;
 }
 
@@ -2224,11 +2229,11 @@ button, input, textarea, select {
   }
   25% {
     transform: scale(1.035);
-    filter: brightness(1.2) drop-shadow(0 0 12px rgba(0, 122, 255, 0.6));
+    filter: brightness(1.2) drop-shadow(0 0 12px rgba(139, 92, 246, 0.6));
   }
   50% {
     transform: scale(1.02);
-    filter: brightness(1.1) drop-shadow(0 0 8px rgba(0, 122, 255, 0.4));
+    filter: brightness(1.1) drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
   }
   100% {
     transform: scale(1);
