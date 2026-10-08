@@ -18,7 +18,6 @@ const chatsListContainer   = document.getElementById('chatsListContainer');
 const chatsEmptyState      = document.getElementById('chatsEmptyState');
 const chatsCountBadge      = document.getElementById('chatsCountBadge');
 const chatsSoundToggleBtn  = document.getElementById('chatsSoundToggleBtn');
-const chatsWakeUpBtn       = document.getElementById('chatsWakeUpBtn');
 const chatsLockAppBtn      = document.getElementById('chatsLockAppBtn');
 const chatsLiveDrawingBtn  = document.getElementById('chatsLiveDrawingBtn');
 
@@ -26,8 +25,6 @@ const chatsLiveDrawingBtn  = document.getElementById('chatsLiveDrawingBtn');
 const avatarImg          = document.getElementById('avatarImg');
 const userNameEl         = document.getElementById('userName');
 const userStatusEl       = document.getElementById('userStatus');
-const statusPingChip     = document.getElementById('statusPingChip');
-const wakeUpBtn          = document.getElementById('wakeUpBtn');
 const avatarBadge        = document.querySelector('.avatar-badge');
 const chatMessages       = document.getElementById('chatMessages');
 const chatInput          = document.getElementById('chatInput');
@@ -866,15 +863,6 @@ function handleWsMessage(msg) {
       createFlyingBalloon(msg.emoji);
       break;
 
-    // ── Wake Up / Call Alert (Live WebSocket) ─────
-    case 'wake_up':
-    case 'ping_call':
-      if (navigator.vibrate) {
-        try { navigator.vibrate([180, 80, 180, 80, 240]); } catch (e) {}
-      }
-      showIncomingWakeUpBanner(currentPartner.name || (activeUser === 'jisu' ? 'Jenu' : 'Jisu'));
-      break;
-
     // ── Seen status ───────────────────────────────
     case 'seen':
     case 'mark_seen':
@@ -901,21 +889,6 @@ function setPresenceUI(online) {
       userStatusEl.className = 'user-status is-offline';
     }
   }
-
-  // Update wake up / ping buttons state
-  const chip = statusPingChip || document.getElementById('statusPingChip');
-  if (chip) {
-    chip.style.display = isOpponentOnline ? 'none' : 'inline-flex';
-  }
-  const wBtn = wakeUpBtn || document.getElementById('wakeUpBtn');
-  if (wBtn) {
-    wBtn.classList.toggle('is-offline-hint', !isOpponentOnline);
-  }
-  const cWBtn = chatsWakeUpBtn || document.getElementById('chatsWakeUpBtn');
-  if (cWBtn) {
-    cWBtn.classList.toggle('is-offline-hint', !isOpponentOnline);
-  }
-
   updateChatsListCardUI();
 }
 
@@ -2351,162 +2324,9 @@ function applyOpponentProfile(url, name) {
 }
 
 // ─────────────────────────────────────────────────
-//  Wake Up / Offline Push Notification Alert
-// ─────────────────────────────────────────────────
-let wakeUpCooldownTimer = null;
-let wakeUpCooldownRemaining = 0;
-
-function updateWakeUpButtonsCooldown(remaining) {
-  const btns = [wakeUpBtn, chatsWakeUpBtn, statusPingChip].filter(Boolean);
-  btns.forEach(btn => {
-    if (remaining > 0) {
-      btn.classList.add('cooldown');
-      btn.disabled = true;
-      btn.title = `Cooldown active (${remaining}s)`;
-    } else {
-      btn.classList.remove('cooldown');
-      btn.disabled = false;
-      btn.title = 'Ping opponent to come online';
-    }
-  });
-
-  const chipText = statusPingChip ? statusPingChip.querySelector('span') : null;
-  if (chipText) {
-    chipText.textContent = remaining > 0 ? `${remaining}s` : 'Wake Up';
-  }
-}
-
-function startWakeUpCooldown(seconds = 12) {
-  clearInterval(wakeUpCooldownTimer);
-  wakeUpCooldownRemaining = seconds;
-  updateWakeUpButtonsCooldown(wakeUpCooldownRemaining);
-
-  wakeUpCooldownTimer = setInterval(() => {
-    wakeUpCooldownRemaining--;
-    if (wakeUpCooldownRemaining <= 0) {
-      clearInterval(wakeUpCooldownTimer);
-      wakeUpCooldownRemaining = 0;
-      updateWakeUpButtonsCooldown(0);
-    } else {
-      updateWakeUpButtonsCooldown(wakeUpCooldownRemaining);
-    }
-  }, 1000);
-}
-
-async function triggerWakeUp() {
-  if (!activeUser) return;
-  if (wakeUpCooldownRemaining > 0) {
-    showToast(`Please wait ${wakeUpCooldownRemaining}s before pinging again`, 'info');
-    return;
-  }
-
-  const partnerName = currentPartner.name || (activeUser === 'jisu' ? 'Jenu' : 'Jisu');
-  const senderName = USER_PROFILES[activeUser]?.userName || (activeUser === 'jisu' ? 'Jisu' : 'Jenu');
-
-  // NO sound on user browser side — notification sound plays on mobile app only
-  if (navigator.vibrate) {
-    try { navigator.vibrate([60, 40, 60]); } catch (e) {}
-  }
-
-  startWakeUpCooldown(12);
-
-  // 1. DIRECT PUSH to ntfy.sh from browser (guarantees instant delivery to mobile app!)
-  try {
-    fetch('https://ntfy.sh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        topic: 'penappnotify',
-        title: `LiveChat: ${senderName} is calling you!`,
-        message: `${senderName} wants you to come online now! Tap to open. 💬`,
-        priority: 5,
-        tags: ['bell', 'phone', 'zap'],
-        click: window.location.href
-      })
-    }).then(res => {
-      console.log('[ntfy] Direct push dispatched to penappnotify, status:', res.status);
-    }).catch(err => {
-      console.warn('[ntfy] Direct push error:', err);
-    });
-  } catch (err) {
-    console.warn('[ntfy] Push trigger error:', err);
-  }
-
-  // 2. Send via WebSocket if open
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    wsSend({ type: 'wake_up' });
-  }
-
-  // 3. Send via server API as backup
-  try {
-    fetch('/api/wake_up', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: activeUser })
-    }).catch(e => console.warn('/api/wake_up error:', e));
-  } catch (err) {
-    console.warn('[WakeUp] Server fallback error:', err);
-  }
-
-  showToast(`🔔 Notification sent to ${partnerName}'s mobile app!`, 'success');
-}
-
-function showIncomingWakeUpBanner(callerName) {
-  let existing = document.getElementById('wakeUpBanner');
-  if (existing) existing.remove();
-
-  const banner = document.createElement('div');
-  banner.id = 'wakeUpBanner';
-  banner.className = 'wake-up-banner';
-  banner.innerHTML = `
-    <div class="wake-up-banner-icon-wrap">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-      </svg>
-    </div>
-    <div class="wake-up-banner-content">
-      <div class="wake-up-banner-title">🔔 ${escapeHtml(callerName)} wants you online!</div>
-      <div class="wake-up-banner-text">Calling you to chat right now</div>
-    </div>
-    <button type="button" class="wake-up-banner-dismiss" id="wakeUpBannerDismiss">Dismiss</button>
-  `;
-
-  chatApp.appendChild(banner);
-
-  const dismissBtn = banner.querySelector('#wakeUpBannerDismiss');
-  if (dismissBtn) {
-    dismissBtn.addEventListener('click', () => {
-      banner.remove();
-    });
-  }
-
-  setTimeout(() => {
-    if (banner.parentElement) {
-      banner.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-      banner.style.opacity = '0';
-      banner.style.transform = 'translateY(-12px)';
-      setTimeout(() => banner.remove(), 320);
-    }
-  }, 7000);
-}
-
-// ─────────────────────────────────────────────────
 //  Event Listeners Setup
 // ─────────────────────────────────────────────────
 function setupEventListeners() {
-  // Wake Up / Push Alert buttons
-  const handleWakeUpClick = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    triggerWakeUp();
-  };
-
-  if (wakeUpBtn) wakeUpBtn.addEventListener('click', handleWakeUpClick);
-  if (chatsWakeUpBtn) chatsWakeUpBtn.addEventListener('click', handleWakeUpClick);
-  if (statusPingChip) statusPingChip.addEventListener('click', handleWakeUpClick);
   // Dismiss virtual keyboard ONLY when clicking on opponent user profile picture
   const opponentAvatarWrapper = document.getElementById('avatarWrapper');
   const headerLeftArea = document.querySelector('.header-left');
