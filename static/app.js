@@ -5,6 +5,23 @@
 //  DOM References
 // ─────────────────────────────────────────────────
 const chatApp            = document.getElementById('chatApp');
+const chatsScreen        = document.getElementById('chatsScreen');
+const conversationScreen = document.getElementById('conversationScreen');
+const chatBackBtn        = document.getElementById('chatBackBtn');
+
+// Chats screen elements
+const chatsUserAvatar      = document.getElementById('chatsUserAvatar');
+const chatsUserSubtitle    = document.getElementById('chatsUserSubtitle');
+const chatsSearchInput     = document.getElementById('chatsSearchInput');
+const chatsSearchClearBtn  = document.getElementById('chatsSearchClearBtn');
+const chatsListContainer   = document.getElementById('chatsListContainer');
+const chatsEmptyState      = document.getElementById('chatsEmptyState');
+const chatsCountBadge      = document.getElementById('chatsCountBadge');
+const chatsSoundToggleBtn  = document.getElementById('chatsSoundToggleBtn');
+const chatsLockAppBtn      = document.getElementById('chatsLockAppBtn');
+const chatsLiveDrawingBtn  = document.getElementById('chatsLiveDrawingBtn');
+
+// Conversation screen elements
 const avatarImg          = document.getElementById('avatarImg');
 const userNameEl         = document.getElementById('userName');
 const userStatusEl       = document.getElementById('userStatus');
@@ -53,6 +70,7 @@ let activeReplyContext = null;
 const USER_PROFILES = {
   jisu: {
     userName: 'Jisu',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256',
     pin: '1470',
     opponent: {
       key: 'jenu',
@@ -62,6 +80,7 @@ const USER_PROFILES = {
   },
   jenu: {
     userName: 'Jenu',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
     pin: '3690',
     opponent: {
       key: 'jisu',
@@ -79,6 +98,8 @@ let currentPartner = { name: '', avatar: '', key: '' };
 let enteredPin     = '';
 let isOpponentOnline = false;
 let opponentLastSeen = null;
+let currentView    = 'chats'; // 'chats' | 'conversation'
+let lastConversationMessage = null;
 
 // WebSocket state
 let ws              = null;
@@ -230,7 +251,12 @@ function loginUser(userKey) {
   currentPartner = { ...profile.opponent };
 
   applyOpponentProfile(profile.opponent.avatar, profile.opponent.name);
-  document.title = `LiveChat — ${profile.opponent.name}`;
+
+  // Render the chats overview list
+  renderChatsList();
+
+  // Show available chats list by default upon PIN enter
+  showChatsList();
 
   if (pinOverlay) pinOverlay.classList.add('unlocked');
 
@@ -271,11 +297,167 @@ function lockApp() {
     currentLiveIncomingRow = null;
   }
   lastOpponentTextLength = 0;
+  lastConversationMessage = null;
   hideOpponentTyping();
+
+  showChatsList();
 
   if (pinOverlay) pinOverlay.classList.remove('unlocked');
   setPresenceOffline();
   isManualDisconnect = false;
+}
+
+// ─────────────────────────────────────────────────
+//  Dual-Screen Navigation & Chats Overview
+// ─────────────────────────────────────────────────
+function showChatsList() {
+  currentView = 'chats';
+  if (chatApp) {
+    chatApp.classList.remove('in-chat');
+  }
+  document.title = 'LiveChat — Chats';
+  updateChatsListCardUI();
+}
+
+function openConversation() {
+  currentView = 'conversation';
+  if (chatApp) {
+    chatApp.classList.add('in-chat');
+  }
+  if (currentPartner && currentPartner.name) {
+    document.title = `LiveChat — ${currentPartner.name}`;
+  }
+  setTimeout(() => {
+    scrollToBottom(true);
+    if (activeUser) {
+      acknowledgeAllSeen(activeUser);
+      if (lastConversationMessage && !lastConversationMessage.isOutgoing) {
+        lastConversationMessage.isSeen = true;
+        updateChatsListCardUI();
+      }
+    }
+  }, 60);
+}
+
+function getCardPreviewText() {
+  if (opponentTyping) {
+    return `<span class="chat-card-preview is-typing">typing...</span>`;
+  }
+  if (!lastConversationMessage) {
+    return 'Tap to open conversation';
+  }
+  const prefix = lastConversationMessage.isOutgoing ? 'You: ' : '';
+  if (lastConversationMessage.msg_type === 'image') {
+    return `${prefix}📷 Photo`;
+  }
+  if (lastConversationMessage.msg_type === 'voice') {
+    const dur = lastConversationMessage.media_duration ? ` (${formatDuration(Math.round(lastConversationMessage.media_duration))})` : '';
+    return `${prefix}🎙️ Voice message${dur}`;
+  }
+  return `${prefix}${escapeHtml(lastConversationMessage.text || '')}`;
+}
+
+function renderChatsList() {
+  if (!activeUser || !chatsListContainer) return;
+  const profile = USER_PROFILES[activeUser];
+  if (!profile) return;
+
+  if (chatsUserAvatar) {
+    chatsUserAvatar.src = profile.avatar;
+  }
+  if (chatsUserSubtitle) {
+    chatsUserSubtitle.textContent = `Logged in as ${profile.userName}`;
+  }
+
+  const partner = profile.opponent;
+  chatsListContainer.innerHTML = `
+    <div class="chat-list-card" id="chatCard-${partner.key}" data-partner="${partner.key}">
+      <div class="chat-card-avatar-wrap">
+        <img class="chat-card-avatar" src="${partner.avatar}" alt="${partner.name}">
+        <span class="chat-card-badge ${isOpponentOnline ? 'is-online' : ''}" id="chatCardBadge"></span>
+      </div>
+      <div class="chat-card-body">
+        <div class="chat-card-row-top">
+          <div class="chat-card-name-wrap">
+            <span class="chat-card-name">${partner.name}</span>
+            <span class="chat-card-verified-tag" title="Verified Connection">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </span>
+          </div>
+          <span class="chat-card-time" id="chatCardTime">${lastConversationMessage ? (lastConversationMessage.time || 'Now') : 'Active'}</span>
+        </div>
+        <div class="chat-card-row-bottom">
+          <span class="chat-card-preview" id="chatCardPreview">${getCardPreviewText()}</span>
+          <span class="chat-card-unread-dot" id="chatCardUnreadDot" style="${(lastConversationMessage && !lastConversationMessage.isOutgoing && !lastConversationMessage.isSeen && currentView !== 'conversation') ? 'display: block;' : 'display: none;'}"></span>
+        </div>
+      </div>
+      <svg class="chat-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </div>
+  `;
+
+  const card = document.getElementById(`chatCard-${partner.key}`);
+  if (card) {
+    card.addEventListener('click', () => {
+      openConversation();
+    });
+  }
+}
+
+function updateChatsListCardUI() {
+  const badge = document.getElementById('chatCardBadge');
+  if (badge) {
+    badge.classList.toggle('is-online', isOpponentOnline);
+  }
+
+  const timeEl = document.getElementById('chatCardTime');
+  if (timeEl) {
+    timeEl.textContent = lastConversationMessage ? (lastConversationMessage.time || 'Now') : 'Active';
+  }
+
+  const prevEl = document.getElementById('chatCardPreview');
+  if (prevEl) {
+    prevEl.innerHTML = getCardPreviewText();
+  }
+
+  const dotEl = document.getElementById('chatCardUnreadDot');
+  if (dotEl) {
+    const isUnread = (lastConversationMessage && !lastConversationMessage.isOutgoing && !lastConversationMessage.isSeen && currentView !== 'conversation');
+    dotEl.style.display = isUnread ? 'block' : 'none';
+  }
+}
+
+function filterChatsList(query) {
+  const q = (query || '').trim().toLowerCase();
+  const card = chatsListContainer ? chatsListContainer.querySelector('.chat-list-card') : null;
+  if (!card) return;
+
+  if (chatsSearchClearBtn) {
+    chatsSearchClearBtn.style.display = q ? 'block' : 'none';
+  }
+
+  if (!q) {
+    card.style.display = 'flex';
+    if (chatsEmptyState) chatsEmptyState.style.display = 'none';
+    if (chatsCountBadge) chatsCountBadge.textContent = '1';
+    return;
+  }
+
+  const name = card.querySelector('.chat-card-name')?.textContent?.toLowerCase() || '';
+  const preview = card.querySelector('.chat-card-preview')?.textContent?.toLowerCase() || '';
+
+  if (name.includes(q) || preview.includes(q)) {
+    card.style.display = 'flex';
+    if (chatsEmptyState) chatsEmptyState.style.display = 'none';
+    if (chatsCountBadge) chatsCountBadge.textContent = '1';
+  } else {
+    card.style.display = 'none';
+    if (chatsEmptyState) chatsEmptyState.style.display = 'flex';
+    if (chatsCountBadge) chatsCountBadge.textContent = '0';
+  }
 }
 
 // ─────────────────────────────────────────────────
@@ -487,6 +669,19 @@ async function loadChatHistory(userKey) {
       }
     }
 
+    if (data.messages && data.messages.length > 0) {
+      const lastMsg = data.messages[data.messages.length - 1];
+      lastConversationMessage = {
+        text: lastMsg.text_content || '',
+        msg_type: lastMsg.msg_type || 'chat',
+        media_duration: lastMsg.media_duration,
+        time: lastMsg.client_time || formatTimeFromIso(lastMsg.created_at),
+        isOutgoing: lastMsg.sender === userKey,
+        isSeen: Boolean(lastMsg.seen)
+      };
+      updateChatsListCardUI();
+    }
+
     if (appendedAny) {
       scrollToBottom();
     }
@@ -500,8 +695,8 @@ async function loadChatHistory(userKey) {
       setPresenceUI(isOpponentOnline);
     }
 
-    // Since the user is viewing chat history, mark all incoming messages seen
-    if (hadIncoming) {
+    // Since the user is viewing chat history, mark all incoming messages seen if in conversation
+    if (hadIncoming && currentView === 'conversation') {
       acknowledgeAllSeen(userKey);
     }
   } catch (err) {
@@ -687,6 +882,7 @@ function setPresenceUI(online) {
       userStatusEl.className = 'user-status is-offline';
     }
   }
+  updateChatsListCardUI();
 }
 
 function setPresenceOffline() {
@@ -727,6 +923,7 @@ function handleOpponentLiveTyping(text) {
   if (typingIndicator) {
     typingIndicator.classList.remove('active');
   }
+  updateChatsListCardUI();
 
   // Create incoming bubble if it does not exist yet
   if (!currentLiveIncomingRow) {
@@ -788,6 +985,7 @@ function showOpponentTyping() {
     typingIndicator.classList.add('active');
     scrollToBottom();
   }
+  updateChatsListCardUI();
   opponentTypingTimer = setTimeout(hideOpponentTyping, 4000);
 }
 
@@ -797,6 +995,7 @@ function hideOpponentTyping() {
   if (typingIndicator) {
     typingIndicator.classList.remove('active');
   }
+  updateChatsListCardUI();
 }
 
 function hideOpponentLivePreview() {
@@ -810,7 +1009,9 @@ function clearChatDOM() {
     currentLiveIncomingRow.remove();
     currentLiveIncomingRow = null;
   }
+  lastConversationMessage = null;
   hideOpponentTyping();
+  updateChatsListCardUI();
 }
 
 // ─────────────────────────────────────────────────
@@ -1136,6 +1337,15 @@ function receiveIncomingMessage(text, timeStr, messageId = null, replyTo = null)
 
   const assignedId = messageId || ('msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
 
+  lastConversationMessage = {
+    text: text,
+    msg_type: 'chat',
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: false,
+    isSeen: currentView === 'conversation'
+  };
+  updateChatsListCardUI();
+
   // If the message was already being typed live, finalize that exact bubble!
   if (currentLiveIncomingRow) {
     resetWaveStream();
@@ -1242,6 +1452,15 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   const messageRow = document.createElement('div');
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
+
+  lastConversationMessage = {
+    text: content,
+    msg_type: 'chat',
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: type === 'outgoing',
+    isSeen: isSeen
+  };
+  updateChatsListCardUI();
 
   const bubbleGroup = document.createElement('div');
   bubbleGroup.className = 'bubble-group';
@@ -1393,6 +1612,16 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   const messageRow = document.createElement('div');
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
+
+  lastConversationMessage = {
+    text: 'Voice note',
+    msg_type: 'voice',
+    media_duration: durationSec,
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: type === 'outgoing',
+    isSeen: isSeen
+  };
+  updateChatsListCardUI();
 
   const bubbleGroup = document.createElement('div');
   bubbleGroup.className = 'bubble-group';
@@ -1581,6 +1810,16 @@ function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, wa
     return;
   }
 
+  lastConversationMessage = {
+    text: 'Voice note',
+    msg_type: 'voice',
+    media_duration: duration,
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: false,
+    isSeen: currentView === 'conversation'
+  };
+  updateChatsListCardUI();
+
   playOpponentKeypressSound();
   appendVoiceMessage(audioData, duration, 'incoming', timeStr, messageId, waveform, false, false, replyTo);
 
@@ -1685,6 +1924,15 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
 
+  lastConversationMessage = {
+    text: 'Photo',
+    msg_type: 'image',
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: type === 'outgoing',
+    isSeen: isSeen
+  };
+  updateChatsListCardUI();
+
   const bubbleGroup = document.createElement('div');
   bubbleGroup.className = 'bubble-group';
 
@@ -1760,6 +2008,16 @@ function receiveIncomingImage(imageUrl, timeStr, messageId = null, replyTo = nul
   }
 
   const assignedId = messageId || ('msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+
+  lastConversationMessage = {
+    text: 'Photo',
+    msg_type: 'image',
+    time: timeStr || formatCurrentTime(),
+    isOutgoing: false,
+    isSeen: currentView === 'conversation'
+  };
+  updateChatsListCardUI();
+
   playOpponentKeypressSound();
   appendImageMessage(imageUrl, 'incoming', timeStr, assignedId, false, false, replyTo);
 
@@ -2161,21 +2419,34 @@ function setupEventListeners() {
       clearReplyContext();
     }
   });
-  // Sound toggle
-  if (soundToggleBtn) {
-    const onIcon  = soundToggleBtn.querySelector('.sound-on-icon');
-    const offIcon = soundToggleBtn.querySelector('.sound-off-icon');
-    const updateSoundUI = () => {
-      soundToggleBtn.classList.toggle('muted', !soundEnabled);
+
+  // Sound toggle (syncs both Chats screen and Conversation screen)
+  function updateGlobalSoundUI() {
+    [soundToggleBtn, chatsSoundToggleBtn].forEach(btn => {
+      if (!btn) return;
+      const onIcon  = btn.querySelector('.sound-on-icon');
+      const offIcon = btn.querySelector('.sound-off-icon');
+      btn.classList.toggle('muted', !soundEnabled);
       if (onIcon)  onIcon.style.display  = soundEnabled ? 'block' : 'none';
       if (offIcon) offIcon.style.display = soundEnabled ? 'none'  : 'block';
-      soundToggleBtn.title = soundEnabled ? 'Typing sound ON (click to mute)' : 'Typing sound OFF (click to enable)';
-    };
-    updateSoundUI();
+      btn.title = soundEnabled ? 'Typing sound ON (click to mute)' : 'Typing sound OFF (click to enable)';
+    });
+  }
+  updateGlobalSoundUI();
+
+  if (soundToggleBtn) {
     soundToggleBtn.addEventListener('click', () => {
       soundEnabled = !soundEnabled;
       localStorage.setItem('chat_typing_sound', soundEnabled);
-      updateSoundUI();
+      updateGlobalSoundUI();
+    });
+  }
+
+  if (chatsSoundToggleBtn) {
+    chatsSoundToggleBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('chat_typing_sound', soundEnabled);
+      updateGlobalSoundUI();
     });
   }
 
@@ -2315,8 +2586,34 @@ function setupEventListeners() {
     });
   }
 
-  // Lock app
+  // Back to Chats List button
+  if (chatBackBtn) {
+    chatBackBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      showChatsList();
+    });
+  }
+
+  // Lock app (from conversation or chats screen)
   if (lockAppBtn) lockAppBtn.addEventListener('click', lockApp);
+  if (chatsLockAppBtn) chatsLockAppBtn.addEventListener('click', lockApp);
+
+  // Search in chats list
+  if (chatsSearchInput) {
+    chatsSearchInput.addEventListener('input', (e) => {
+      filterChatsList(e.target.value);
+    });
+  }
+
+  if (chatsSearchClearBtn) {
+    chatsSearchClearBtn.addEventListener('click', () => {
+      if (chatsSearchInput) {
+        chatsSearchInput.value = '';
+        filterChatsList('');
+        chatsSearchInput.focus();
+      }
+    });
+  }
 
   // Clear chat (empties messages.json on PHP receiver and local DB)
   if (clearChatBtn) {
