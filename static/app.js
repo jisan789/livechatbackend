@@ -844,6 +844,7 @@ function renderChatsList() {
 }
 
 function openConversationWith(partner) {
+  isClosingByAvatarClick = false;
   currentPartner = {
     key: partner.username,
     name: partner.display_name || partner.username,
@@ -862,6 +863,10 @@ function openConversationWith(partner) {
   lastOpponentTextLength = 0;
   lastConversationMessage = null;
   hideOpponentTyping();
+  if (chatInput) {
+    chatInput.value = '';
+    updateActionBtnState();
+  }
 
   // 1. Immediately trigger hardware slide transition with zero delay
   openConversation();
@@ -962,15 +967,45 @@ async function logoutUser() {
 
 function showChatsList() {
   currentView = 'chats';
+  isClosingByAvatarClick = true;
   if (chatApp) {
     chatApp.classList.remove('in-chat');
   }
+
+  // Definitively deactivate and blur chatInput so mobile keyboard closes
+  if (chatInput) {
+    chatInput.blur();
+    chatInput.value = '';
+    updateActionBtnState();
+  }
+  if (inputPill) {
+    inputPill.classList.remove('focused');
+  }
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
+
+  // Stop live typing broadcasting immediately
+  clearTimeout(typingOutTimer);
+  wsSend({ type: 'live_typing', text: '' });
+  wsSend({ type: 'typing_stop' });
+
+  // Cancel any active voice recording
+  if (typeof isRecording !== 'undefined' && isRecording) {
+    cancelVoiceRecording();
+  }
+
   document.title = 'LiveChat — Chats';
   updateChatsListCardUI();
+
+  setTimeout(() => {
+    isClosingByAvatarClick = false;
+  }, 400);
 }
 
 function openConversation() {
   currentView = 'conversation';
+  isClosingByAvatarClick = false;
   if (chatApp) {
     chatApp.classList.add('in-chat');
   }
@@ -2273,10 +2308,11 @@ function markMessageInteraction() {
 }
 
 function keepInputFocused() {
-  if (chatInput && !isClosingByAvatarClick) {
+  if (currentView !== 'conversation' || isClosingByAvatarClick) return;
+  if (chatInput) {
     chatInput.focus({ preventScroll: true });
-    setTimeout(() => { if (chatInput && !isClosingByAvatarClick) chatInput.focus({ preventScroll: true }); }, 10);
-    setTimeout(() => { if (chatInput && !isClosingByAvatarClick) chatInput.focus({ preventScroll: true }); }, 50);
+    setTimeout(() => { if (chatInput && !isClosingByAvatarClick && currentView === 'conversation') chatInput.focus({ preventScroll: true }); }, 10);
+    setTimeout(() => { if (chatInput && !isClosingByAvatarClick && currentView === 'conversation') chatInput.focus({ preventScroll: true }); }, 50);
   }
 }
 
@@ -3163,6 +3199,13 @@ function setupEventListeners() {
 
   // Input — send live typing events in real time
   function sendLiveTypingEvent() {
+    if (currentView !== 'conversation' || isClosingByAvatarClick) {
+      if (chatInput) {
+        chatInput.value = '';
+        chatInput.blur();
+      }
+      return;
+    }
     const rawVal = chatInput.value;
     updateActionBtnState();
     lastLocalTextLength = rawVal.length;
@@ -3182,18 +3225,30 @@ function setupEventListeners() {
     }
   }
 
-  chatInput.addEventListener('input', sendLiveTypingEvent);
+  chatInput.addEventListener('input', () => {
+    if (currentView !== 'conversation' || isClosingByAvatarClick) {
+      if (chatInput) {
+        chatInput.value = '';
+        chatInput.blur();
+      }
+      return;
+    }
+    sendLiveTypingEvent();
+  });
 
   // Helper to send message while keeping focus on input (keeps mobile keyboard open)
   function executeSend() {
+    if (currentView !== 'conversation' || isClosingByAvatarClick) return;
     markMessageInteraction();
     if (chatInput.value.trim()) {
       handleSend();
       chatInput.focus({ preventScroll: true });
       scrollToBottom();
       setTimeout(() => { 
-        chatInput.focus({ preventScroll: true }); 
-        scrollToBottom();
+        if (currentView === 'conversation') {
+          chatInput.focus({ preventScroll: true }); 
+          scrollToBottom();
+        }
       }, 10);
       setTimeout(scrollToBottom, 60);
     }
@@ -3201,6 +3256,14 @@ function setupEventListeners() {
 
   // Enter to send (desktop and mobile virtual keyboards)
   chatInput.addEventListener('keydown', (e) => {
+    if (currentView !== 'conversation' || isClosingByAvatarClick) {
+      e.preventDefault();
+      if (chatInput) {
+        chatInput.value = '';
+        chatInput.blur();
+      }
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       executeSend();
@@ -3277,10 +3340,32 @@ function setupEventListeners() {
 
   // Back to Chats List button
   if (chatBackBtn) {
-    chatBackBtn.addEventListener('click', (e) => {
-      e.preventDefault();
+    const handleBackClick = (e) => {
+      if (e) e.preventDefault();
+      isClosingByAvatarClick = true;
+      if (chatInput) {
+        chatInput.blur();
+        chatInput.value = '';
+        updateActionBtnState();
+      }
+      if (inputPill) inputPill.classList.remove('focused');
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
       showChatsList();
+    };
+
+    chatBackBtn.addEventListener('pointerdown', () => {
+      isClosingByAvatarClick = true;
+      if (chatInput) chatInput.blur();
     });
+
+    chatBackBtn.addEventListener('touchstart', () => {
+      isClosingByAvatarClick = true;
+      if (chatInput) chatInput.blur();
+    }, { passive: true });
+
+    chatBackBtn.addEventListener('click', handleBackClick);
   }
 
   // Lock app (from conversation or chats screen)
@@ -3647,16 +3732,19 @@ function setupKeyboardUIHandling() {
     window.visualViewport.addEventListener('scroll', onVP);
   }
   chatInput.addEventListener('focus', () => {
+    if (currentView !== 'conversation') {
+      chatInput.blur();
+      return;
+    }
     inputPill.classList.add('focused');
     setTimeout(scrollToBottom, 250);
   });
   chatInput.addEventListener('blur', () => {
-    // NOTHING should close the keyboard until clicking on opponent user profile pic!
-    if (!isClosingByAvatarClick) {
-      chatInput.focus({ preventScroll: true });
+    inputPill.classList.remove('focused');
+    if (currentView !== 'conversation' || isClosingByAvatarClick) {
       return;
     }
-    inputPill.classList.remove('focused');
+    chatInput.focus({ preventScroll: true });
   });
 }
 
