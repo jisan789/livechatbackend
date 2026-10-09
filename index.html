@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <title>LiveChat</title>
   <meta name="description" content="Professional real-time chat application with iconic Apple liquid glassmorphism, live keystroke streaming, and secure passcode lock.">
-  <link rel="stylesheet" href="static/style.css?v=13.0">
+  <link rel="stylesheet" href="static/style.css?v=14.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
@@ -54,40 +54,13 @@
         </div>
 
         <div class="header-actions-capsule">
-          <!-- Sound Toggle -->
-          <button class="action-icon-btn" id="chatsSoundToggleBtn" aria-label="Toggle typing sound" title="Typing sound enabled (Click to mute)">
-            <svg class="sound-on-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-            </svg>
-            <svg class="sound-off-icon" style="display: none;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <line x1="23" y1="9" x2="17" y2="15"></line>
-              <line x1="17" y1="9" x2="23" y2="15"></line>
-            </svg>
-          </button>
-
-          <div class="header-action-divider" aria-hidden="true"></div>
-
-          <!-- New Chat / Users Directory -->
-          <button class="action-icon-btn" id="chatsNewChatBtn" aria-label="Start New Chat" title="Start New Conversation">
+          <!-- Write / LiveDraw -->
+          <a href="https://livedrawing.onrender.com/" target="_blank" rel="noopener noreferrer" class="action-icon-btn" id="chatsLiveDrawingBtn" aria-label="Open LiveDraw" title="LiveDraw / Write">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              <line x1="12" y1="8" x2="12" y2="14"></line>
-              <line x1="9" y1="11" x2="15" y2="11"></line>
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
             </svg>
-          </button>
-
-          <div class="header-action-divider" aria-hidden="true"></div>
-
-          <!-- Profile & Settings -->
-          <button class="action-icon-btn" id="chatsProfileBtn" aria-label="Profile and Settings" title="Profile & Settings">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </button>
+          </a>
 
           <div class="header-action-divider" aria-hidden="true"></div>
 
@@ -98,16 +71,6 @@
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
           </button>
-
-          <div class="header-action-divider" aria-hidden="true"></div>
-
-          <!-- Subtle Link to LiveDraw -->
-          <a href="https://livedrawing.onrender.com/" target="_blank" rel="noopener noreferrer" class="tiny-external-btn" id="chatsLiveDrawingBtn" aria-label="Open LiveDraw" title="LiveDraw">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 20h9"></path>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-            </svg>
-          </a>
         </div>
       </header>
 
@@ -647,6 +610,6 @@
     </div>
   </div>
 
-  <script src="static/app.js?v=13.0"></script>
+  <script src="static/app.js?v=14.0"></script>
 </body>
 </html>

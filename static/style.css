@@ -700,7 +700,8 @@ button, input, textarea, select {
   margin: 0 1px;
 }
 
-.action-icon-btn {
+.action-icon-btn,
+.action-icon-btn:visited {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -710,6 +711,7 @@ button, input, textarea, select {
   align-items: center;
   justify-content: center;
   color: #334155;
+  text-decoration: none;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
