@@ -854,20 +854,23 @@ function openConversationWith(partner) {
 
   applyOpponentProfile(currentPartner.avatar, currentPartner.name);
 
-  // Clear previous message DOM
-  document.querySelectorAll('#chatMessages .message-row').forEach(row => row.remove());
+  // Clear previous message DOM fast
+  if (chatMessages) {
+    chatMessages.querySelectorAll('.message-row').forEach(row => row.remove());
+  }
   if (currentLiveIncomingRow) currentLiveIncomingRow = null;
   lastOpponentTextLength = 0;
   lastConversationMessage = null;
   hideOpponentTyping();
 
-  // Load chat history for this user
-  loadChatHistory(partner.username);
-
-  // Query live presence
-  wsSend({ type: 'presence_check', partner: partner.username });
-
+  // 1. Immediately trigger hardware slide transition with zero delay
   openConversation();
+
+  // 2. Fetch history and query presence smoothly in background
+  setTimeout(() => {
+    loadChatHistory(partner.username);
+    wsSend({ type: 'presence_check', partner: partner.username });
+  }, 40);
 }
 
 // ─────────────────────────────────────────────────
@@ -961,11 +964,7 @@ function showChatsList() {
   currentView = 'chats';
   if (chatApp) {
     chatApp.classList.remove('in-chat');
-    chatApp.scrollLeft = 0;
   }
-  document.documentElement.scrollLeft = 0;
-  document.body.scrollLeft = 0;
-  window.scrollTo(0, 0);
   document.title = 'LiveChat — Chats';
   updateChatsListCardUI();
 }
@@ -974,10 +973,7 @@ function openConversation() {
   currentView = 'conversation';
   if (chatApp) {
     chatApp.classList.add('in-chat');
-    chatApp.scrollLeft = 0;
   }
-  document.documentElement.scrollLeft = 0;
-  document.body.scrollLeft = 0;
   if (currentPartner && currentPartner.name) {
     document.title = `LiveChat — ${currentPartner.name}`;
   }
@@ -990,7 +986,7 @@ function openConversation() {
         updateChatsListCardUI();
       }
     }
-  }, 60);
+  }, 280);
 }
 
 function getCardPreviewText() {
@@ -2256,20 +2252,15 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
 function scrollToBottom(forceInstant = false) {
   if (!chatMessages) return;
 
-  const performScroll = () => {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  };
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  // Immediate synchronous scroll
-  performScroll();
-
-  // Re-scroll on next animation frame after layout/repaint
-  requestAnimationFrame(performScroll);
-
-  // Timed passes for virtual keyboards, dynamic font rendering, and reflow
-  setTimeout(performScroll, 30);
-  setTimeout(performScroll, 100);
-  setTimeout(performScroll, 250);
+  if (!forceInstant) {
+    requestAnimationFrame(() => {
+      if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────

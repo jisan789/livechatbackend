@@ -141,7 +141,7 @@ button, input, textarea, select {
 }
 
 /* ══════════════════════════════════════════════════
-   DUAL-SCREEN NAVIGATION (CHATS OVERVIEW & CONVERSATION)
+   DUAL-SCREEN NAVIGATION (ULTRA-SMOOTH GPU TRANSITIONS)
    ══════════════════════════════════════════════════ */
 .chats-screen,
 .conversation-screen {
@@ -151,38 +151,37 @@ button, input, textarea, select {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: rgba(248, 250, 252, 0.96);
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease, visibility 0.28s;
+  background: #F8FAFC;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
 }
 
 .chats-screen {
   z-index: 2;
-  transform: translateX(0);
-  opacity: 1;
-  visibility: visible;
+  transform: translate3d(0, 0, 0);
   pointer-events: auto;
 }
 
 .conversation-screen {
   z-index: 3;
-  transform: translateX(100%);
-  opacity: 0;
-  visibility: hidden;
+  transform: translate3d(100%, 0, 0);
   pointer-events: none;
+  box-shadow: -6px 0 24px rgba(15, 23, 42, 0.08);
 }
 
 .chat-app.in-chat .chats-screen {
-  transform: translateX(-20%);
-  opacity: 0;
-  visibility: hidden;
+  transform: translate3d(-24%, 0, 0);
   pointer-events: none;
 }
 
 .chat-app.in-chat .conversation-screen {
-  transform: translateX(0);
-  opacity: 1;
-  visibility: visible;
+  transform: translate3d(0, 0, 0);
   pointer-events: auto;
 }
 
@@ -366,7 +365,7 @@ button, input, textarea, select {
   border: 1px solid rgba(226, 232, 240, 0.95);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   position: relative;
   user-select: none;
   -webkit-user-select: none;
