@@ -1382,11 +1382,12 @@ function renderChatHistoryMessages(messages) {
     if (msg.msg_type === 'chat') {
       appendMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
       appendedAny = true;
-    } else if (msg.msg_type === 'voice' && msg.text_content) {
-      appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, deliveryStatus, true, replyToData);
+    } else if (msg.msg_type === 'voice' && (msg.text_content || msg.audio || msg.text)) {
+      const voiceSrc = msg.audio || msg.text_content || msg.text;
+      appendVoiceMessage(voiceSrc, msg.media_duration || msg.duration || 1, type, timeStr, assignedMsgId, null, deliveryStatus, true, replyToData);
       appendedAny = true;
-    } else if (msg.msg_type === 'image' && msg.text_content) {
-      appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
+    } else if (msg.msg_type === 'image' && (msg.text_content || msg.image)) {
+      appendImageMessage(msg.text_content || msg.image, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
       appendedAny = true;
     }
 
@@ -1590,19 +1591,24 @@ function handleWsMessage(msg) {
       break;
 
     // ── Voice note (Live WebSocket) ───────────────
-    case 'voice':
+    case 'voice': {
+      const voiceSrc = msg.audio || msg.text || msg.text_content;
+      const voiceDur = msg.duration || msg.media_duration || 1;
+      const voiceTime = msg.time || msg.client_time;
+      const voiceId = msg.id || msg.client_msg_id;
       if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
-        receiveIncomingVoice(msg.audio, msg.duration, msg.time, msg.id, msg.waveform, msg.reply_to);
-        notifyMessageSeen(msg.id);
+        receiveIncomingVoice(voiceSrc, voiceDur, voiceTime, voiceId, msg.waveform, msg.reply_to);
+        if (voiceId) notifyMessageSeen(voiceId);
       } else {
         const u = registeredUsersList.find(item => item.username === msg.from);
         if (u) {
-          u.last_message = { msg_type: 'voice', client_time: msg.time, seen: false, sender: msg.from };
+          u.last_message = { msg_type: 'voice', text_content: 'Voice note', client_time: voiceTime, seen: false, sender: msg.from };
           renderChatsList();
         }
         showToast(`Voice note from ${u ? u.display_name : msg.from}`, 'info');
       }
       break;
+    }
 
     // ── Image message (Live WebSocket) ────────────
     case 'image':
@@ -2379,6 +2385,19 @@ const DEFAULT_SPEECH_WAVEFORM = [
 let currentlyPlayingVoiceAudio = null;
 let currentlyPlayingVoiceReset = null;
 
+function formatAudioSrc(src) {
+  if (!src || typeof src !== 'string') return '';
+  src = src.trim();
+  // Strip codec attributes like ;codecs=opus that prevent playback on some browsers
+  if (src.startsWith('data:audio/') && src.includes(';codecs=')) {
+    src = src.replace(/;codecs=[^;,\s]+/, '');
+  }
+  if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:')) {
+    return src;
+  }
+  return `data:audio/webm;base64,${src}`;
+}
+
 function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeenOrStatus = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
@@ -2484,12 +2503,18 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   const waveformContainer  = bubble.querySelector('.voice-waveform');
   const waveformBars       = bubble.querySelectorAll('.waveform-bar');
 
+  const cleanAudioSrc = formatAudioSrc(audioData);
   let audio = null;
-  if (audioData) {
-    try {
-      audio = new Audio(audioData);
-    } catch (e) {
-      console.warn('[Voice] Audio init failed:', e);
+
+  function initAudio() {
+    if (!audio && cleanAudioSrc) {
+      try {
+        audio = new Audio(cleanAudioSrc);
+        audio.preload = 'metadata';
+        setupAudioListeners();
+      } catch (e) {
+        console.warn('[Voice] Audio init failed:', e);
+      }
     }
   }
 
@@ -2505,7 +2530,9 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
     }
   }
 
-  if (audio) {
+  function setupAudioListeners() {
+    if (!audio) return;
+
     audio.addEventListener('timeupdate', () => {
       const dur = audio.duration && !isNaN(audio.duration) ? audio.duration : durationSec;
       const progress = Math.min(1, Math.max(0, audio.currentTime / dur));
@@ -2532,9 +2559,14 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
     });
   }
 
+  if (cleanAudioSrc) {
+    initAudio();
+  }
+
   // Interactive Click-to-Seek on waveform
   waveformContainer.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (!audio) initAudio();
     if (!audio) return;
     const rect = waveformContainer.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -2555,6 +2587,7 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
 
   playBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (!audio) initAudio();
     if (!audio) {
       showToast('No audio stream available', 'error');
       return;
@@ -2585,6 +2618,12 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
       pauseIcon.style.display = 'none';
     }
   });
+
+  // Tapping voiceBubble toggles play/pause smoothly
+  voiceBubble.addEventListener('click', (e) => {
+    if (e.target.closest('.voice-waveform') || e.target.closest('.voice-play-btn')) return;
+    playBtn.click();
+  });
 }
 
 function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, waveform = null, replyTo = null) {
@@ -2594,10 +2633,13 @@ function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, wa
     return;
   }
 
+  const cleanAudio = formatAudioSrc(audioData);
+  const finalDuration = Math.max(1, Math.round(Number(duration) || 1));
+
   lastConversationMessage = {
     text: 'Voice note',
     msg_type: 'voice',
-    media_duration: duration,
+    media_duration: finalDuration,
     time: timeStr || formatCurrentTime(),
     isOutgoing: false,
     isSeen: currentView === 'conversation'
@@ -2605,9 +2647,9 @@ function receiveIncomingVoice(audioData, duration, timeStr, messageId = null, wa
   updateChatsListCardUI();
 
   playOpponentKeypressSound();
-  appendVoiceMessage(audioData, duration, 'incoming', timeStr, messageId, waveform, false, false, replyTo);
+  appendVoiceMessage(cleanAudio, finalDuration, 'incoming', timeStr, messageId, waveform, false, false, replyTo);
 
-  if (activeUser && currentPartner.key && messageId) {
+  if (activeUser && currentPartner && currentPartner.key && messageId) {
     notifyMessageSeen(messageId);
   }
 }
@@ -3002,7 +3044,10 @@ async function startVoiceRecording() {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64Audio = reader.result;
+      let base64Audio = reader.result;
+      if (typeof base64Audio === 'string') {
+        base64Audio = formatAudioSrc(base64Audio);
+      }
       const clientTime = formatCurrentTime();
       const voiceMsgId = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
       const replyPayload = activeReplyContext ? { ...activeReplyContext } : null;

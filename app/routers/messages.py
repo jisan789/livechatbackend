@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from app.auth import extract_token_from_request, verify_session_token
 from app.crud import get_conversation, clear_conversation, mark_messages_seen
 from app.websocket import connections, safe_send
+from app.async_utils import run_in_thread
 
 logger = logging.getLogger("livechat.messages")
 router = APIRouter(prefix="/api/messages", tags=["messages"])
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/messages", tags=["messages"])
 @router.get("")
 async def api_get_messages(request: Request):
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
 
     user1 = request.query_params.get("user1") or (current_user["username"] if current_user else "")
     user2 = request.query_params.get("user2") or request.query_params.get("opponent", "")
@@ -21,7 +22,7 @@ async def api_get_messages(request: Request):
     if not user1 or not user2:
         return JSONResponse({"status": "error", "message": "Missing conversation participants"}, status_code=400)
 
-    msgs = await asyncio.to_thread(get_conversation, user1, user2)
+    msgs = await run_in_thread(get_conversation, user1, user2)
     return {"status": "ok", "messages": msgs, "count": len(msgs)}
 
 
@@ -38,7 +39,7 @@ async def api_clear_messages(request: Request):
         body = {}
 
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
 
     user1 = (current_user["username"] if current_user else body.get("user1", "")).strip().lower()
     user2 = (body.get("opponent") or body.get("user2") or "").strip().lower()
@@ -52,7 +53,7 @@ async def api_clear_messages(request: Request):
             status_code=400,
         )
 
-    ok, deleted_count = await asyncio.to_thread(clear_conversation, user1, user2)
+    ok, deleted_count = await run_in_thread(clear_conversation, user1, user2)
 
     if not ok:
         return JSONResponse({"status": "error", "message": "Failed to clear conversation"}, status_code=500)
@@ -76,11 +77,11 @@ async def api_mark_seen(request: Request):
         body = {}
 
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
 
     sender = (body.get("sender") or body.get("opponent") or "").strip().lower()
     recipient = (current_user["username"] if current_user else (body.get("recipient") or body.get("user") or "")).strip().lower()
     ids = body.get("ids", [])
 
-    ok = await asyncio.to_thread(mark_messages_seen, sender, recipient, ids)
+    ok = await run_in_thread(mark_messages_seen, sender, recipient, ids)
     return {"status": "ok" if ok else "error"}

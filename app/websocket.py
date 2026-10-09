@@ -45,18 +45,21 @@ async def broadcast(payload: dict, exclude: Optional[str] = None):
         connections.pop(uname, None)
 
 
+from app.async_utils import run_in_thread
+
+
 async def background_save_message(user_key: str, recipient: str, msg_type: str, data: dict):
     """Asynchronously persist a chat message without blocking WebSocket throughput."""
     try:
         if msg_type == "chat":
-            content = data.get("text")
+            content = data.get("text") or data.get("text_content")
         elif msg_type == "image":
-            content = data.get("image")
+            content = data.get("image") or data.get("text_content")
         else:
-            content = data.get("audio")
+            content = data.get("audio") or data.get("text") or data.get("text_content")
 
         client_id = data.get("id") or data.get("client_msg_id")
-        await asyncio.to_thread(
+        await run_in_thread(
             save_message,
             sender=user_key,
             recipient=recipient,
@@ -75,7 +78,7 @@ async def background_save_message(user_key: str, recipient: str, msg_type: str, 
 async def background_mark_seen(sender: str, recipient: str, ids: Optional[list] = None):
     """Mark seen in background task."""
     try:
-        await asyncio.to_thread(
+        await run_in_thread(
             mark_messages_seen,
             sender=sender,
             recipient=recipient,

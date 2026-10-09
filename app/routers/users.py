@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.auth import extract_token_from_request, verify_session_token
 from app.crud import get_all_users, update_user_profile
 from app.websocket import connections
+from app.async_utils import run_in_thread
 
 router = APIRouter(prefix="/api", tags=["users"])
 
@@ -11,10 +12,10 @@ router = APIRouter(prefix="/api", tags=["users"])
 @router.get("/users")
 async def api_get_users(request: Request):
     token = extract_token_from_request(request)
-    current_user_obj = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user_obj = await run_in_thread(verify_session_token, token) if token else None
     current_uname = current_user_obj["username"] if current_user_obj else request.query_params.get("current_user")
 
-    users_list = await asyncio.to_thread(get_all_users, current_uname)
+    users_list = await run_in_thread(get_all_users, current_uname)
 
     # Attach live online flag from active connections
     for u in users_list:
@@ -27,7 +28,7 @@ async def api_get_users(request: Request):
 @router.post("/user/profile")
 async def api_update_profile(request: Request):
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
     if not current_user:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
@@ -39,7 +40,7 @@ async def api_update_profile(request: Request):
     display_name = data.get("display_name", "").strip() or None
     avatar = data.get("avatar", "").strip() or None
 
-    updated = await asyncio.to_thread(
+    updated = await run_in_thread(
         update_user_profile,
         username=current_user["username"],
         display_name=display_name,

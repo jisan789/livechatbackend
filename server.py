@@ -36,6 +36,7 @@ from app.websocket import (
     background_save_message,
     background_mark_seen,
 )
+from app.async_utils import run_in_thread
 from app.routers import auth as auth_router
 from app.routers import users as users_router
 from app.routers import messages as messages_router
@@ -166,7 +167,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
             if msg_type in ("chat", "voice", "image") and target_user:
                 asyncio.create_task(background_save_message(user_key, target_user, msg_type, data))
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+                asyncio.create_task(run_in_thread(update_user_presence, user_key, now_iso))
 
             # Forward seen event and persist seen status in background task
             if msg_type in ("seen", "mark_seen") and target_user:
@@ -181,7 +182,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
         if connections.get(user_key) is websocket:
             connections.pop(user_key, None)
             now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-            asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+            asyncio.create_task(run_in_thread(update_user_presence, user_key, now_iso))
             logger.info(f"[-] {user_key} disconnected (total online: {len(connections)})")
             await broadcast_presence(user_key, "offline", now_iso)
         else:
@@ -195,7 +196,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
 async def api_get_presence(user_key: str):
     user_key = user_key.strip().lower()
     is_online = user_key in connections
-    last_seen = await asyncio.to_thread(get_user_presence, user_key) if not is_online else None
+    last_seen = await run_in_thread(get_user_presence, user_key) if not is_online else None
     return JSONResponse({
         "status": "ok",
         "user": user_key,
@@ -208,15 +209,15 @@ async def api_get_presence(user_key: str):
 async def get_messages_opponent(opponent: str, request: Request):
     opponent = opponent.strip().lower()
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
     user_key = current_user["username"] if current_user else request.query_params.get("user")
 
     if not user_key:
         return JSONResponse({"status": "error", "message": "User not authenticated"}, status_code=401)
 
-    messages = await asyncio.to_thread(get_conversation, user_key, opponent)
+    messages = await run_in_thread(get_conversation, user_key, opponent)
     is_online = opponent in connections
-    last_seen = await asyncio.to_thread(get_user_presence, opponent) if not is_online else None
+    last_seen = await run_in_thread(get_user_presence, opponent) if not is_online else None
 
     return JSONResponse({
         "status": "ok",
@@ -231,7 +232,7 @@ async def get_messages_opponent(opponent: str, request: Request):
 @app.post("/api/messages/seen")
 async def api_messages_seen(request: Request):
     token = extract_token_from_request(request)
-    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    current_user = await run_in_thread(verify_session_token, token) if token else None
     try:
         body = await request.json()
     except Exception:

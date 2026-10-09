@@ -259,6 +259,7 @@ def save_message(
     recipient = recipient.strip().lower()
 
     payload = {
+        "action": "send",
         "sender": sender,
         "recipient": recipient,
         "msg_type": msg_type,
