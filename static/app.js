@@ -1731,6 +1731,12 @@ function handleOpponentLiveTyping(text) {
     scrollToBottom();
   }
 
+  // Play peaceful keypress sound as characters are typed by opponent when mute is off
+  if (text.length !== lastOpponentTextLength) {
+    playOpponentLiveSound();
+  }
+  lastOpponentTextLength = text.length;
+
   // Auto-cleanup after 8s of silence if abandoned
   opponentTypingTimer = setTimeout(() => {
     if (currentLiveIncomingRow) {
@@ -3171,6 +3177,11 @@ function setupEventListeners() {
       soundEnabled = !soundEnabled;
       localStorage.setItem('chat_typing_sound', soundEnabled);
       updateGlobalSoundUI();
+      if (soundEnabled) {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+        playKeypressSound();
+      }
     });
   }
 
@@ -3208,7 +3219,14 @@ function setupEventListeners() {
     }
     const rawVal = chatInput.value;
     updateActionBtnState();
-    lastLocalTextLength = rawVal.length;
+
+    // Play subtle typing sound for local keystrokes when mute is off
+    if (rawVal.length !== lastLocalTextLength) {
+      if (rawVal.length > 0) {
+        playKeypressSound();
+      }
+      lastLocalTextLength = rawVal.length;
+    }
 
     // Stream keystrokes live to opponent before message is sent
     if (rawVal.length > 0) {
@@ -3777,6 +3795,18 @@ function getAudioContext() {
   return audioCtx;
 }
 
+const unlockAudioOnGesture = () => {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  if (!audioBuffersLoaded) {
+    preloadKeypressSounds();
+  }
+};
+document.addEventListener('pointerdown', unlockAudioOnGesture, { once: true });
+document.addEventListener('keydown', unlockAudioOnGesture, { once: true });
+
 async function preloadKeypressSounds() {
   if (audioBuffersLoaded) return;
   const ctx = getAudioContext();
@@ -3822,15 +3852,73 @@ function getOpponentGainNode(ctx) {
 }
 
 function playKeypressSound() {
-  // Typing audio disabled: user requested visual indicators only without typing sounds
-  return;
+  if (!soundEnabled) return;
+  const now = performance.now();
+  if (now - lastLocalSoundPlayTime < 32) return;
+  lastLocalSoundPlayTime = now;
+
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  let idx = Math.floor(Math.random() * SOUND_FILES.length);
+  if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
+  lastSoundIndex = idx;
+
+  if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
+    try {
+      const src = ctx.createBufferSource();
+      const gain = getLocalGainNode(ctx);
+      src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
+      src.connect(gain);
+      src.start(0);
+      return;
+    } catch (_) { /* ignore */ }
+  }
+
+  if (fallbackAudio && fallbackAudio[idx]) {
+    try {
+      const clone = fallbackAudio[idx].cloneNode();
+      clone.volume = 0.25;
+      clone.play().catch(() => {});
+    } catch (_) {}
+  }
 }
 
 const playOpponentKeypressSound = playKeypressSound;
 
 function playOpponentLiveSound() {
-  // Typing audio disabled: user requested visual indicators only without typing sounds
-  return;
+  if (!soundEnabled) return;
+  const now = performance.now();
+  if (now - lastOpponentSoundPlayTime < 32) return;
+  lastOpponentSoundPlayTime = now;
+
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  let idx = Math.floor(Math.random() * SOUND_FILES.length);
+  if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
+  lastSoundIndex = idx;
+
+  if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
+    try {
+      const src = ctx.createBufferSource();
+      const gain = getOpponentGainNode(ctx);
+      src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
+      src.connect(gain);
+      src.start(0);
+      return;
+    } catch (_) { /* ignore */ }
+  }
+
+  if (fallbackAudio && fallbackAudio[idx]) {
+    try {
+      const clone = fallbackAudio[idx].cloneNode();
+      clone.volume = 0.11;
+      clone.play().catch(() => {});
+    } catch (_) {}
+  }
 }
 
 // ─────────────────────────────────────────────────
