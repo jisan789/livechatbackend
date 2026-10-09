@@ -122,7 +122,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
                 continue
 
             msg_type = data.get("type", "")
-            target_user = (data.get("to") or data.get("recipient") or "").strip().lower()
+            target_user = (data.get("to") or data.get("recipient") or data.get("opponent") or "").strip().lower()
 
             # Heartbeat ping
             if msg_type in ("ping", "presence_check"):
@@ -226,6 +226,25 @@ async def get_messages_opponent(opponent: str, request: Request):
         "opponent_last_seen": last_seen,
         "messages": messages,
     })
+
+
+@app.post("/api/messages/seen")
+async def api_messages_seen(request: Request):
+    token = extract_token_from_request(request)
+    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    user_key = (current_user["username"] if current_user else body.get("user") or "").strip().lower()
+    opponent = (body.get("opponent") or body.get("to") or "").strip().lower()
+    ids = body.get("ids") or ([body.get("msg_id")] if body.get("msg_id") else None)
+    is_all = body.get("all", False)
+    if user_key and opponent:
+        asyncio.create_task(background_mark_seen(sender=opponent, recipient=user_key, ids=None if is_all else ids))
+        await send_to_user(opponent, {"type": "seen", "from": user_key, "ids": ids, "all": is_all})
+        return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "error", "message": "Missing parameters"}, status_code=400)
 
 
 # ─────────────────────────────────────────────────────────────

@@ -1203,9 +1203,10 @@ function acknowledgeAllSeen(userKey) {
   if (!userKey || !currentPartner.key) return;
   wsSend({
     type: 'seen',
-    all: true,
+    to: currentPartner.key,
+    opponent: currentPartner.key,
     user: userKey,
-    opponent: currentPartner.key
+    all: true
   });
   authFetch('/api/messages/seen', {
     method: 'POST',
@@ -1218,9 +1219,10 @@ function notifyMessageSeen(messageId) {
   if (!activeUser || !currentPartner.key || !messageId) return;
   wsSend({
     type: 'seen',
+    to: currentPartner.key,
+    opponent: currentPartner.key,
     msg_id: messageId,
-    user: activeUser,
-    opponent: currentPartner.key
+    user: activeUser
   });
   authFetch('/api/messages/seen', {
     method: 'POST',
@@ -1342,7 +1344,7 @@ async function loadChatHistory(userKey) {
         if (isOutgoing) {
           const badgeWrap = matchingRow.querySelector('.msg-status-badge');
           if (badgeWrap) {
-            badgeWrap.outerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+            badgeWrap.outerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'delivered');
           }
         }
         continue;
@@ -1356,15 +1358,16 @@ async function loadChatHistory(userKey) {
       }
 
       const assignedMsgId = clientMsgIdStr || ('msg_' + dbIdStr);
+      const deliveryStatus = isSeen ? 'seen' : 'delivered';
 
       if (msg.msg_type === 'chat') {
-        appendMessage(msg.text_content, type, timeStr, assignedMsgId, isSeen, true, replyToData);
+        appendMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'voice' && msg.text_content) {
-        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, isSeen, true, replyToData);
+        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, deliveryStatus, true, replyToData);
         appendedAny = true;
       } else if (msg.msg_type === 'image' && msg.text_content) {
-        appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, isSeen, true, replyToData);
+        appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
         appendedAny = true;
       }
 
@@ -2218,7 +2221,7 @@ function handleSend() {
 // ─────────────────────────────────────────────────
 //  Append Message Bubble
 // ─────────────────────────────────────────────────
-function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false, replyTo = null) {
+function appendMessage(content, type = 'outgoing', timeStr = null, messageId = null, isSeenOrStatus = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -2226,6 +2229,11 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   const messageRow = document.createElement('div');
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
+
+  const isSeen = (isSeenOrStatus === true || isSeenOrStatus === 'seen');
+  const statusStr = typeof isSeenOrStatus === 'string'
+    ? isSeenOrStatus
+    : (isSeen ? 'seen' : 'sent');
 
   lastConversationMessage = {
     text: content,
@@ -2261,7 +2269,7 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
 
   if (type === 'outgoing') {
     const statusWrap = document.createElement('div');
-    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    statusWrap.innerHTML = getMessageStatusHtml(statusStr);
     if (statusWrap.firstElementChild) {
       bubble.appendChild(statusWrap.firstElementChild);
     }
@@ -2337,7 +2345,7 @@ const DEFAULT_SPEECH_WAVEFORM = [
 let currentlyPlayingVoiceAudio = null;
 let currentlyPlayingVoiceReset = null;
 
-function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeen = false, skipScroll = false, replyTo = null) {
+function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = null, messageId = null, customWaveform = null, isSeenOrStatus = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -2348,6 +2356,11 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   const messageRow = document.createElement('div');
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
+
+  const isSeen = (isSeenOrStatus === true || isSeenOrStatus === 'seen');
+  const statusStr = typeof isSeenOrStatus === 'string'
+    ? isSeenOrStatus
+    : (isSeen ? 'seen' : 'sent');
 
   lastConversationMessage = {
     text: 'Voice note',
@@ -2400,7 +2413,7 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
 
   if (type === 'outgoing') {
     const statusWrap = document.createElement('div');
-    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    statusWrap.innerHTML = getMessageStatusHtml(statusStr);
     if (statusWrap.firstElementChild) {
       bubble.appendChild(statusWrap.firstElementChild);
     }
@@ -2652,7 +2665,7 @@ async function handleSendImage(file) {
   }
 }
 
-function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeen = false, skipScroll = false, replyTo = null) {
+function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, messageId = null, isSeenOrStatus = false, skipScroll = false, replyTo = null) {
   if (messageId && document.querySelector(`#chatMessages .message-row[data-msg-id="${messageId}"]`)) {
     return;
   }
@@ -2660,6 +2673,11 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   const messageRow = document.createElement('div');
   messageRow.className = `message-row ${type}`;
   messageRow.dataset.msgId = assignedId;
+
+  const isSeen = (isSeenOrStatus === true || isSeenOrStatus === 'seen');
+  const statusStr = typeof isSeenOrStatus === 'string'
+    ? isSeenOrStatus
+    : (isSeen ? 'seen' : 'sent');
 
   lastConversationMessage = {
     text: 'Photo',
@@ -2708,7 +2726,7 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
 
   if (type === 'outgoing') {
     const statusWrap = document.createElement('div');
-    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    statusWrap.innerHTML = getMessageStatusHtml(statusStr);
     if (statusWrap.firstElementChild) {
       bubble.appendChild(statusWrap.firstElementChild);
     }
