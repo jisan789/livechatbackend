@@ -1068,35 +1068,16 @@ function restoreUserCardPreview(userKey) {
 }
 
 function getMessageStatusHtml(status = 'sent') {
-  if (status === 'pending') {
-    return `<span class="msg-status-badge status-pending" title="Sending...">
-      <svg class="status-icon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="8" cy="8" r="6"/>
-        <path d="M8 5v3l2 1"/>
-      </svg>
-    </span>`;
-  }
-  if (status === 'sent') {
-    return `<span class="msg-status-badge status-sent" title="Sent">
-      <svg class="status-icon status-check-single" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3.5 8.5l3 3 6.5-6.5"/>
-      </svg>
-    </span>`;
+  if (status === 'pending' || status === 'sent') {
+    // For only send show nothing
+    return `<span class="msg-status-badge status-sent" title="Sent"></span>`;
   }
   if (status === 'delivered') {
-    return `<span class="msg-status-badge status-delivered" title="Delivered">
-      <svg class="status-icon status-check-double" viewBox="0 0 18 14" width="16" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M1.5 7.5l3 3 6.5-6.5"/>
-        <path d="M6 7.5l3 3 6.5-6.5"/>
-      </svg>
-    </span>`;
+    // For delivered a white small dot on current space
+    return `<span class="msg-status-badge status-delivered" title="Delivered"><span class="status-dot dot-delivered"></span></span>`;
   }
-  return `<span class="msg-status-badge status-seen" title="Seen">
-    <svg class="status-icon status-check-double" viewBox="0 0 18 14" width="16" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M1.5 7.5l3 3 6.5-6.5"/>
-      <path d="M6 7.5l3 3 6.5-6.5"/>
-    </svg>
-  </span>`;
+  // For seen, dot becomes orange
+  return `<span class="msg-status-badge status-seen" title="Seen"><span class="status-dot dot-seen"></span></span>`;
 }
 
 function updateMessageDeliveryStatus(msgId, status) {
@@ -1107,6 +1088,13 @@ function updateMessageDeliveryStatus(msgId, status) {
   const badgeWrap = row.querySelector('.msg-status-badge');
   if (badgeWrap) {
     badgeWrap.outerHTML = getMessageStatusHtml(status);
+  } else {
+    const bubble = row.querySelector('.bubble');
+    if (bubble) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = getMessageStatusHtml(status);
+      if (wrap.firstElementChild) bubble.appendChild(wrap.firstElementChild);
+    }
   }
 }
 

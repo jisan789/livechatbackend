@@ -549,13 +549,12 @@ button, input, textarea, select {
 .chat-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   background: rgba(139, 92, 246, 0.09);
   border: 1px solid rgba(139, 92, 246, 0.22);
   color: #8B5CF6;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 8px 5px 4px;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -571,11 +570,11 @@ button, input, textarea, select {
 }
 
 .chat-back-btn:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 
 .chat-back-btn .back-text {
-  line-height: 1;
+  display: none !important;
 }
 
 .avatar-wrapper {
@@ -912,47 +911,47 @@ button, input, textarea, select {
 }
 
 /* ══════════════════════════════════════════════════
-   MODERN DELIVERY & READ STATUS (WHATSAPP / TELEGRAM STYLE)
+   DELIVERY & SEEN STATUS INDICATORS (DOT STYLES)
    ══════════════════════════════════════════════════ */
 .msg-status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: absolute;
-  bottom: 4px;
-  right: 5px;
-  color: rgba(255, 255, 255, 0.62);
-  line-height: 1;
+  bottom: 5px;
+  right: 6px;
   pointer-events: none;
   z-index: 6;
-  transition: color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
 }
 
-.msg-status-badge .status-icon {
-  display: block;
-  flex-shrink: 0;
-}
-
-.msg-status-badge.status-pending {
-  color: rgba(255, 255, 255, 0.45);
-  animation: statusSpin 1.8s linear infinite;
-}
-
-@keyframes statusSpin {
-  100% { transform: rotate(360deg); }
-}
-
+/* For only send show nothing */
+.msg-status-badge.status-pending,
 .msg-status-badge.status-sent {
-  color: rgba(255, 255, 255, 0.72);
+  display: none !important;
 }
 
-.msg-status-badge.status-delivered {
-  color: rgba(255, 255, 255, 0.92);
+.msg-status-badge .status-dot {
+  display: block;
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-.msg-status-badge.status-seen {
-  color: #38BDF8; /* Cyan blue read receipt */
-  filter: drop-shadow(0 0 2.5px rgba(56, 189, 248, 0.65));
+/* For delivered a white small dot on current spaces */
+.msg-status-badge.status-delivered .status-dot,
+.msg-status-badge .status-dot.dot-delivered {
+  background: #FFFFFF;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
+  transform: scale(1);
+}
+
+/* For seen, dots become orange that means seen */
+.msg-status-badge.status-seen .status-dot,
+.msg-status-badge .status-dot.dot-seen {
+  background: #FF9500; /* Vibrant warm orange */
+  box-shadow: 0 0 6px rgba(255, 149, 0, 0.95), 0 0 2px rgba(255, 149, 0, 1);
+  transform: scale(1.1);
 }
 
 .message-row.incoming .msg-status-badge {
@@ -1046,7 +1045,8 @@ button, input, textarea, select {
   -webkit-user-select: none;
 }
 
-.bubble.image-bubble .seen-dot {
+.bubble.image-bubble .seen-dot,
+.bubble.image-bubble .msg-status-badge {
   bottom: 8px;
   right: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
