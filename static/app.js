@@ -2355,11 +2355,9 @@ function markMessageInteraction() {
 }
 
 function keepInputFocused() {
-  if (currentView !== 'conversation' || isClosingByAvatarClick) return;
-  if (chatInput) {
+  if (currentView !== 'conversation') return;
+  if (chatInput && document.activeElement !== chatInput) {
     chatInput.focus({ preventScroll: true });
-    setTimeout(() => { if (chatInput && !isClosingByAvatarClick && currentView === 'conversation') chatInput.focus({ preventScroll: true }); }, 10);
-    setTimeout(() => { if (chatInput && !isClosingByAvatarClick && currentView === 'conversation') chatInput.focus({ preventScroll: true }); }, 50);
   }
 }
 
@@ -3261,13 +3259,7 @@ function setupEventListeners() {
 
   // Input — send live typing events in real time
   function sendLiveTypingEvent() {
-    if (currentView !== 'conversation' || isClosingByAvatarClick) {
-      if (chatInput) {
-        chatInput.value = '';
-        chatInput.blur();
-      }
-      return;
-    }
+    if (currentView !== 'conversation') return;
     const rawVal = chatInput.value;
     updateActionBtnState();
 
@@ -3295,19 +3287,13 @@ function setupEventListeners() {
   }
 
   chatInput.addEventListener('input', () => {
-    if (currentView !== 'conversation' || isClosingByAvatarClick) {
-      if (chatInput) {
-        chatInput.value = '';
-        chatInput.blur();
-      }
-      return;
-    }
+    if (currentView !== 'conversation') return;
     sendLiveTypingEvent();
   });
 
   // Helper to send message while keeping focus on input (keeps mobile keyboard open)
   function executeSend() {
-    if (currentView !== 'conversation' || isClosingByAvatarClick) return;
+    if (currentView !== 'conversation') return;
     markMessageInteraction();
     if (chatInput.value.trim()) {
       handleSend();
@@ -3315,24 +3301,15 @@ function setupEventListeners() {
       scrollToBottom();
       setTimeout(() => { 
         if (currentView === 'conversation') {
-          chatInput.focus({ preventScroll: true }); 
           scrollToBottom();
         }
-      }, 10);
-      setTimeout(scrollToBottom, 60);
+      }, 60);
     }
   }
 
   // Enter to send (desktop and mobile virtual keyboards)
   chatInput.addEventListener('keydown', (e) => {
-    if (currentView !== 'conversation' || isClosingByAvatarClick) {
-      e.preventDefault();
-      if (chatInput) {
-        chatInput.value = '';
-        chatInput.blur();
-      }
-      return;
-    }
+    if (currentView !== 'conversation') return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       executeSend();
@@ -3356,14 +3333,12 @@ function setupEventListeners() {
     markMessageInteraction();
     if (isRecording) {
       stopAndSendVoiceRecording();
+      chatInput.focus({ preventScroll: true });
     } else if (chatInput.value.trim()) {
       executeSend();
     } else {
       startVoiceRecording();
     }
-    chatInput.focus({ preventScroll: true });
-    setTimeout(() => { chatInput.focus({ preventScroll: true }); }, 10);
-    setTimeout(() => { chatInput.focus({ preventScroll: true }); }, 50);
   }
 
   actionBtn.addEventListener('touchstart', (e) => {
@@ -3796,12 +3771,11 @@ function setupEventListeners() {
 // ─────────────────────────────────────────────────
 function setupKeyboardUIHandling() {
   if (window.visualViewport) {
-    const onVP = () => {
-      if (chatApp) chatApp.style.height = `${window.visualViewport.height}px`;
-      scrollToBottom();
-    };
-    window.visualViewport.addEventListener('resize', onVP);
-    window.visualViewport.addEventListener('scroll', onVP);
+    window.visualViewport.addEventListener('resize', () => {
+      if (currentView === 'conversation') {
+        scrollToBottom();
+      }
+    });
   }
   chatInput.addEventListener('focus', () => {
     if (currentView !== 'conversation') {
@@ -3809,14 +3783,10 @@ function setupKeyboardUIHandling() {
       return;
     }
     inputPill.classList.add('focused');
-    setTimeout(scrollToBottom, 250);
+    setTimeout(scrollToBottom, 150);
   });
   chatInput.addEventListener('blur', () => {
     inputPill.classList.remove('focused');
-    if (currentView !== 'conversation' || isClosingByAvatarClick) {
-      return;
-    }
-    chatInput.focus({ preventScroll: true });
   });
 }
 
