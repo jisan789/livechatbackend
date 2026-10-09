@@ -1,5 +1,5 @@
-// LiveChat — Real-time WebSocket Client
-// Jisu (PIN 1470) ↔ Jenu (PIN 3690)
+// LiveChat — Multi-User Real-time WebSocket Client
+// Apple Liquid Glass Aesthetics & Passcode Security
 
 // ─────────────────────────────────────────────────
 //  DOM References
@@ -10,16 +10,21 @@ const conversationScreen = document.getElementById('conversationScreen');
 const chatBackBtn        = document.getElementById('chatBackBtn');
 
 // Chats screen elements
-const chatsUserAvatar      = document.getElementById('chatsUserAvatar');
-const chatsUserSubtitle    = document.getElementById('chatsUserSubtitle');
-const chatsSearchInput     = document.getElementById('chatsSearchInput');
-const chatsSearchClearBtn  = document.getElementById('chatsSearchClearBtn');
-const chatsListContainer   = document.getElementById('chatsListContainer');
-const chatsEmptyState      = document.getElementById('chatsEmptyState');
-const chatsCountBadge      = document.getElementById('chatsCountBadge');
-const chatsSoundToggleBtn  = document.getElementById('chatsSoundToggleBtn');
-const chatsLockAppBtn      = document.getElementById('chatsLockAppBtn');
-const chatsLiveDrawingBtn  = document.getElementById('chatsLiveDrawingBtn');
+const chatsUserAvatar            = document.getElementById('chatsUserAvatar');
+const chatsUserSubtitle          = document.getElementById('chatsUserSubtitle');
+const chatsHeaderProfileTrigger  = document.getElementById('chatsHeaderProfileTrigger');
+const chatsSearchInput           = document.getElementById('chatsSearchInput');
+const chatsSearchClearBtn        = document.getElementById('chatsSearchClearBtn');
+const chatsListContainer         = document.getElementById('chatsListContainer');
+const chatsEmptyState            = document.getElementById('chatsEmptyState');
+const chatsCountBadge            = document.getElementById('chatsCountBadge');
+const chatsSoundToggleBtn        = document.getElementById('chatsSoundToggleBtn');
+const chatsNewChatBtn            = document.getElementById('chatsNewChatBtn');
+const chatsProfileBtn            = document.getElementById('chatsProfileBtn');
+const chatsLockAppBtn            = document.getElementById('chatsLockAppBtn');
+const chatsLiveDrawingBtn        = document.getElementById('chatsLiveDrawingBtn');
+const chatsEmptyNewBtn           = document.getElementById('chatsEmptyNewBtn');
+const chatsSectionTitle          = document.getElementById('chatsSectionTitle');
 
 // Conversation screen elements
 const avatarImg          = document.getElementById('avatarImg');
@@ -50,11 +55,60 @@ const soundToggleBtn     = document.getElementById('soundToggleBtn');
 const loveBlastBtn       = document.getElementById('loveBlastBtn');
 const clearChatBtn       = document.getElementById('clearChatBtn');
 const lockAppBtn         = document.getElementById('lockAppBtn');
+
+// PIN Lock Overlay elements
 const pinOverlay         = document.getElementById('pinOverlay');
 const pinDotsContainer   = document.getElementById('pinDots');
 const pinFeedback        = document.getElementById('pinFeedback');
 const pinBackspaceBtn    = document.getElementById('pinBackspaceBtn');
+const pinUserBadgeWrap   = document.getElementById('pinUserBadgeWrap');
+const pinUserAvatar      = document.getElementById('pinUserAvatar');
+const pinTitleText       = document.getElementById('pinTitleText');
+const pinSubtitleText    = document.getElementById('pinSubtitleText');
+const pinSwitchAccountBtn= document.getElementById('pinSwitchAccountBtn');
 
+// Auth Overlay (Login & Register) elements
+const authOverlay        = document.getElementById('authOverlay');
+const authTabLogin       = document.getElementById('authTabLogin');
+const authTabRegister    = document.getElementById('authTabRegister');
+const loginForm          = document.getElementById('loginForm');
+const registerForm       = document.getElementById('registerForm');
+const loginUsernameInput = document.getElementById('loginUsername');
+const loginPasswordInput = document.getElementById('loginPassword');
+const loginFeedback      = document.getElementById('loginFeedback');
+const regUsernameInput   = document.getElementById('regUsername');
+const regDisplayNameInput= document.getElementById('regDisplayName');
+const regPasswordInput   = document.getElementById('regPassword');
+const regFeedback        = document.getElementById('regFeedback');
+const regAvatarPresets   = document.getElementById('regAvatarPresets');
+
+// Passkey Setup Modal elements
+const passkeySetupModal        = document.getElementById('passkeySetupModal');
+const passkeySetupTitle        = document.getElementById('passkeySetupTitle');
+const passkeySetupSubtitle     = document.getElementById('passkeySetupSubtitle');
+const passkeySetupDots         = document.getElementById('passkeySetupDots');
+const passkeySetupFeedback     = document.getElementById('passkeySetupFeedback');
+const passkeySetupSkipBtn      = document.getElementById('passkeySetupSkipBtn');
+const passkeySetupBackspaceBtn = document.getElementById('passkeySetupBackspaceBtn');
+
+// Users Directory Sheet elements
+const usersModal             = document.getElementById('usersModal');
+const usersModalCloseBtn     = document.getElementById('usersModalCloseBtn');
+const directorySearchInput   = document.getElementById('directorySearchInput');
+const usersListContainer     = document.getElementById('usersListContainer');
+
+// Profile & Settings Sheet elements
+const profileModal             = document.getElementById('profileModal');
+const profileModalCloseBtn     = document.getElementById('profileModalCloseBtn');
+const profileMainAvatar        = document.getElementById('profileMainAvatar');
+const profileDisplayNameInput  = document.getElementById('profileDisplayNameInput');
+const profileAvatarPresets     = document.getElementById('profileAvatarPresets');
+const profileSaveBtn           = document.getElementById('profileSaveBtn');
+const profileChangePasskeyBtn  = document.getElementById('profileChangePasskeyBtn');
+const profilePasskeyBtnText    = document.getElementById('profilePasskeyBtnText');
+const profileLogoutBtn         = document.getElementById('profileLogoutBtn');
+
+// Reply elements
 const replyPreviewBar          = document.getElementById('replyPreviewBar');
 const replyPreviewTitle        = document.getElementById('replyPreviewTitle');
 const replyPreviewText         = document.getElementById('replyPreviewText');
@@ -65,41 +119,43 @@ const replyPreviewCloseBtn     = document.getElementById('replyPreviewCloseBtn')
 let activeReplyContext = null;
 
 // ─────────────────────────────────────────────────
-//  User Profiles
+//  Suggested DiceBear Avatars
 // ─────────────────────────────────────────────────
-const USER_PROFILES = {
-  jisu: {
-    userName: 'Jisu',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256',
-    pin: '1470',
-    opponent: {
-      key: 'jenu',
-      name: 'Jenu',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256'
-    }
-  },
-  jenu: {
-    userName: 'Jenu',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
-    pin: '3690',
-    opponent: {
-      key: 'jisu',
-      name: 'Mr. IC',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=256'
-    }
-  }
-};
+const PRESET_AVATARS = [
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Shadow',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Cyber',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Pixel',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Nova',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=Aria',
+  'https://api.dicebear.com/7.x/lorelei/svg?seed=Kai',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Zoe',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Echo',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Blaze',
+  'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cool',
+  'https://api.dicebear.com/7.x/micah/svg?seed=Milo'
+];
+let selectedRegAvatar = '';
+let selectedProfileAvatar = '';
 
 // ─────────────────────────────────────────────────
-//  App State
+//  Multi-User App State
 // ─────────────────────────────────────────────────
-let activeUser     = null;
-let currentPartner = { name: '', avatar: '', key: '' };
-let enteredPin     = '';
-let isOpponentOnline = false;
-let opponentLastSeen = null;
-let currentView    = 'chats'; // 'chats' | 'conversation'
+let activeUser          = null; // username of currently authenticated user
+let currentUserProfile  = null; // { username, display_name, avatar, has_passkey }
+let registeredUsersList = [];   // list of other registered users
+let currentPartner      = { name: '', avatar: '', key: '' }; // active conversation partner
+let enteredPin          = '';
+let isOpponentOnline    = false;
+let opponentLastSeen    = null;
+let currentView         = 'chats'; // 'chats' | 'conversation'
 let lastConversationMessage = null;
+
+// Passkey setup flow state
+let passkeySetupStep = 1; // 1 = enter pin, 2 = confirm pin
+let passkeySetupFirstPin = '';
+let passkeySetupEnteredPin = '';
+let passkeySetupIsInitial = false;
 
 // WebSocket state
 let ws              = null;
@@ -125,44 +181,425 @@ const SOUND_FILES = [
   'keypress-005.wav','keypress-006.wav','keypress-007.wav','keypress-008.wav'
 ];
 
+// Helper: authenticated fetch wrapper ensuring Authorization header is attached
+async function authFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  const token = localStorage.getItem('chat_session_token');
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
+  options.credentials = 'include';
+  return fetch(url, options);
+}
+
 // ─────────────────────────────────────────────────
-//  Boot
+//  Boot & Authentication Lifecycle
 // ─────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   setupPinPad();
+  setupPasskeySetupPad();
+  setupAuthListeners();
   setupEventListeners();
   setupKeyboardUIHandling();
   preloadKeypressSounds();
+  renderAvatarPresets();
 
-  // Parse external vector emojis for popover grid and UI
   const popover = document.getElementById('emojiPopover');
   if (popover) parseEmojisInDOM(popover);
 
-  const saved = sessionStorage.getItem('chat_active_user');
-  if (saved && USER_PROFILES[saved]) {
-    loginUser(saved);
-  } else {
-    lockApp();
-  }
+  // Validate persistent session cookie on start
+  await checkAuthStatus();
 });
 
+async function checkAuthStatus() {
+  try {
+    const res = await authFetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'ok' && data.user) {
+        initLoggedInSession(data.user);
+        if (data.user.has_passkey) {
+          // Remember username & password login via cookies for long term,
+          // but require the 4-digit passkey on every new visit for security
+          lockApp();
+        } else {
+          // If passkey is not configured yet, unlock and prompt setup
+          unlockApp();
+          openPasskeySetup(true);
+        }
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Auth check network warning:', err);
+  }
+
+  // Not authenticated: present login / create account overlay
+  showAuthOverlay();
+}
+
+function initLoggedInSession(user) {
+  currentUserProfile = user;
+  activeUser = user.username;
+  sessionStorage.setItem('chat_active_user', user.username);
+
+  if (chatsUserAvatar) {
+    chatsUserAvatar.src = user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.username)}`;
+  }
+  if (chatsUserSubtitle) {
+    chatsUserSubtitle.textContent = `@${user.username}`;
+  }
+  if (chatsHeaderTitle) {
+    chatsHeaderTitle.textContent = user.display_name || user.username;
+  }
+
+  // Configure PIN overlay for this user
+  if (pinUserBadgeWrap && pinUserAvatar) {
+    pinUserBadgeWrap.style.display = 'block';
+    pinUserAvatar.src = user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.username)}`;
+  }
+  if (pinTitleText) {
+    pinTitleText.textContent = user.display_name || user.username;
+  }
+  if (pinSubtitleText) {
+    pinSubtitleText.textContent = 'Enter 4-digit passcode';
+  }
+
+  hideAuthOverlay();
+  fetchRegisteredUsers();
+}
+
 // ─────────────────────────────────────────────────
-//  PIN Lock Screen
+//  Auth Overlay (Login & Create Account)
 // ─────────────────────────────────────────────────
-function setupPinPad() {
-  document.querySelectorAll('.pin-key[data-digit]').forEach((key) => {
+function showAuthOverlay() {
+  if (pinOverlay) pinOverlay.classList.remove('unlocked');
+  if (authOverlay) {
+    authOverlay.style.display = 'flex';
+  }
+}
+
+function hideAuthOverlay() {
+  if (authOverlay) {
+    authOverlay.style.display = 'none';
+  }
+}
+
+function renderAvatarPresets() {
+  if (regAvatarPresets) {
+    regAvatarPresets.innerHTML = PRESET_AVATARS.map((url, i) => `
+      <div class="avatar-preset-chip ${selectedRegAvatar === url ? 'selected' : ''}" data-avatar="${url}" title="Avatar ${i + 1}">
+        <img src="${url}" alt="DiceBear Avatar ${i + 1}">
+      </div>
+    `).join('');
+
+    regAvatarPresets.querySelectorAll('.avatar-preset-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const isAlreadySelected = chip.classList.contains('selected');
+        regAvatarPresets.querySelectorAll('.avatar-preset-chip').forEach(c => c.classList.remove('selected'));
+        if (isAlreadySelected) {
+          selectedRegAvatar = '';
+        } else {
+          chip.classList.add('selected');
+          selectedRegAvatar = chip.dataset.avatar;
+        }
+      });
+    });
+  }
+
+  if (profileAvatarPresets) {
+    profileAvatarPresets.innerHTML = PRESET_AVATARS.map((url, i) => `
+      <div class="avatar-preset-chip ${selectedProfileAvatar === url ? 'selected' : ''}" data-avatar="${url}" title="Avatar ${i + 1}">
+        <img src="${url}" alt="DiceBear Avatar ${i + 1}">
+      </div>
+    `).join('');
+
+    profileAvatarPresets.querySelectorAll('.avatar-preset-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const isAlreadySelected = chip.classList.contains('selected');
+        profileAvatarPresets.querySelectorAll('.avatar-preset-chip').forEach(c => c.classList.remove('selected'));
+        if (isAlreadySelected) {
+          selectedProfileAvatar = '';
+          if (profileMainAvatar && currentUserProfile) {
+            profileMainAvatar.src = currentUserProfile.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserProfile.username)}`;
+          }
+        } else {
+          chip.classList.add('selected');
+          selectedProfileAvatar = chip.dataset.avatar;
+          if (profileMainAvatar) profileMainAvatar.src = selectedProfileAvatar;
+        }
+      });
+    });
+  }
+}
+
+function setupAuthListeners() {
+  // Tabs
+  if (authTabLogin && authTabRegister) {
+    authTabLogin.addEventListener('click', () => {
+      authTabLogin.classList.add('active');
+      authTabRegister.classList.remove('active');
+      if (loginForm) loginForm.style.display = 'flex';
+      if (registerForm) registerForm.style.display = 'none';
+      if (loginFeedback) loginFeedback.textContent = '';
+    });
+
+    authTabRegister.addEventListener('click', () => {
+      authTabRegister.classList.add('active');
+      authTabLogin.classList.remove('active');
+      if (loginForm) loginForm.style.display = 'none';
+      if (registerForm) registerForm.style.display = 'flex';
+      if (regFeedback) regFeedback.textContent = '';
+    });
+  }
+
+  // Login Form Submit
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = loginUsernameInput ? loginUsernameInput.value.trim() : '';
+      const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
+      if (!username || !password) return;
+
+      if (loginFeedback) {
+        loginFeedback.textContent = 'Verifying credentials...';
+        loginFeedback.classList.remove('success');
+      }
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'ok') {
+          if (data.token) localStorage.setItem('chat_session_token', data.token);
+          initLoggedInSession(data.user);
+          if (data.has_passkey) {
+            unlockApp();
+          } else {
+            unlockApp();
+            openPasskeySetup(true);
+          }
+        } else {
+          if (loginFeedback) loginFeedback.textContent = data.message || 'Invalid credentials';
+        }
+      } catch (err) {
+        if (loginFeedback) loginFeedback.textContent = 'Server connection error. Please try again.';
+      }
+    });
+  }
+
+  // Register Form Submit
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = regUsernameInput ? regUsernameInput.value.trim() : '';
+      const displayName = regDisplayNameInput ? regDisplayNameInput.value.trim() : '';
+      const password = regPasswordInput ? regPasswordInput.value.trim() : '';
+      if (!username || !password) return;
+
+      if (regFeedback) {
+        regFeedback.textContent = 'Creating account...';
+        regFeedback.classList.remove('success');
+      }
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username,
+            display_name: displayName || username,
+            password,
+            avatar: selectedRegAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(username)}`
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'ok') {
+          if (data.token) localStorage.setItem('chat_session_token', data.token);
+          initLoggedInSession(data.user);
+          unlockApp();
+          // Ask to set up 4-digit passkey right after creating account!
+          openPasskeySetup(true);
+        } else {
+          if (regFeedback) regFeedback.textContent = data.message || 'Registration failed';
+        }
+      } catch (err) {
+        if (regFeedback) regFeedback.textContent = 'Server connection error. Please try again.';
+      }
+    });
+  }
+
+  // Switch account button from PIN overlay
+  if (pinSwitchAccountBtn) {
+    pinSwitchAccountBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      logoutUser();
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────
+//  Passkey Setup Flow (Prompt after account creation)
+// ─────────────────────────────────────────────────
+function openPasskeySetup(isInitial = false) {
+  passkeySetupIsInitial = isInitial;
+  passkeySetupStep = 1;
+  passkeySetupFirstPin = '';
+  passkeySetupEnteredPin = '';
+  updatePasskeySetupDotsUI();
+
+  if (passkeySetupTitle) {
+    passkeySetupTitle.textContent = 'Set Up Passcode';
+  }
+  if (passkeySetupSubtitle) {
+    passkeySetupSubtitle.textContent = 'Choose a 4-digit passcode for quick unlock';
+  }
+  if (passkeySetupFeedback) {
+    passkeySetupFeedback.textContent = '';
+  }
+  if (passkeySetupModal) {
+    passkeySetupModal.style.display = 'flex';
+  }
+}
+
+function closePasskeySetup() {
+  if (passkeySetupModal) {
+    passkeySetupModal.style.display = 'none';
+  }
+}
+
+function setupPasskeySetupPad() {
+  document.querySelectorAll('.setup-pin-key[data-digit]').forEach(key => {
     key.addEventListener('click', (e) => {
       e.preventDefault();
-      const digit = key.getAttribute('data-digit');
-      if (digit !== null) {
-        handlePinDigit(digit);
-      }
+      const d = key.getAttribute('data-digit');
+      if (d !== null) handlePasskeySetupDigit(d);
     });
   });
 
-  const backBtn = pinBackspaceBtn || document.getElementById('pinBackspaceBtn');
-  if (backBtn) {
-    backBtn.addEventListener('click', (e) => {
+  if (passkeySetupBackspaceBtn) {
+    passkeySetupBackspaceBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handlePasskeySetupBackspace();
+    });
+  }
+
+  if (passkeySetupSkipBtn) {
+    passkeySetupSkipBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      closePasskeySetup();
+      showToast('You can set a passcode anytime in settings', 'info');
+    });
+  }
+}
+
+function handlePasskeySetupDigit(digit) {
+  if (passkeySetupEnteredPin.length >= 4) return;
+  passkeySetupEnteredPin += digit;
+  updatePasskeySetupDotsUI();
+
+  if (passkeySetupEnteredPin.length === 4) {
+    setTimeout(processPasskeySetupStep, 150);
+  }
+}
+
+function handlePasskeySetupBackspace() {
+  if (passkeySetupEnteredPin.length > 0) {
+    passkeySetupEnteredPin = passkeySetupEnteredPin.slice(0, -1);
+    updatePasskeySetupDotsUI();
+  }
+}
+
+function updatePasskeySetupDotsUI() {
+  if (!passkeySetupDots) return;
+  passkeySetupDots.querySelectorAll('.pin-dot').forEach((dot, i) => {
+    dot.classList.toggle('filled', i < passkeySetupEnteredPin.length);
+  });
+}
+
+async function processPasskeySetupStep() {
+  if (passkeySetupStep === 1) {
+    // Step 1 complete -> request confirmation
+    passkeySetupFirstPin = passkeySetupEnteredPin;
+    passkeySetupEnteredPin = '';
+    passkeySetupStep = 2;
+    updatePasskeySetupDotsUI();
+
+    if (passkeySetupSubtitle) passkeySetupSubtitle.textContent = 'Re-enter your 4-digit passcode to confirm';
+    if (passkeySetupFeedback) {
+      passkeySetupFeedback.textContent = 'Confirm passcode';
+      passkeySetupFeedback.style.color = '#8B5CF6';
+    }
+  } else if (passkeySetupStep === 2) {
+    // Step 2 complete -> compare
+    if (passkeySetupEnteredPin === passkeySetupFirstPin) {
+      if (passkeySetupFeedback) {
+        passkeySetupFeedback.textContent = 'Saving passcode...';
+        passkeySetupFeedback.style.color = '#10B981';
+      }
+
+      try {
+        const res = await authFetch('/api/auth/passkey/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passkey: passkeySetupEnteredPin })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'ok') {
+          if (currentUserProfile) currentUserProfile.has_passkey = true;
+          closePasskeySetup();
+          showToast('Passcode set successfully ✓', 'info');
+        } else {
+          showPasskeySetupError(data.message || 'Failed to save passcode');
+        }
+      } catch (err) {
+        showPasskeySetupError('Network error saving passcode');
+      }
+    } else {
+      showPasskeySetupError('Passcodes did not match. Try again.');
+      setTimeout(() => {
+        passkeySetupStep = 1;
+        passkeySetupFirstPin = '';
+        passkeySetupEnteredPin = '';
+        updatePasskeySetupDotsUI();
+        if (passkeySetupSubtitle) passkeySetupSubtitle.textContent = 'Choose a 4-digit passcode for quick unlock';
+      }, 700);
+    }
+  }
+}
+
+function showPasskeySetupError(msg) {
+  if (passkeySetupDots) passkeySetupDots.classList.add('error');
+  if (passkeySetupFeedback) {
+    passkeySetupFeedback.textContent = msg;
+    passkeySetupFeedback.style.color = '#EF4444';
+  }
+  setTimeout(() => {
+    passkeySetupEnteredPin = '';
+    updatePasskeySetupDotsUI();
+    if (passkeySetupDots) passkeySetupDots.classList.remove('error');
+  }, 500);
+}
+
+// ─────────────────────────────────────────────────
+//  PIN Lock & Unlock Screen
+// ─────────────────────────────────────────────────
+function setupPinPad() {
+  document.querySelectorAll('.pin-key[data-digit]:not(.setup-pin-key)').forEach((key) => {
+    key.addEventListener('click', (e) => {
+      e.preventDefault();
+      const digit = key.getAttribute('data-digit');
+      if (digit !== null) handlePinDigit(digit);
+    });
+  });
+
+  if (pinBackspaceBtn) {
+    pinBackspaceBtn.addEventListener('click', (e) => {
       e.preventDefault();
       handlePinBackspace();
     });
@@ -170,7 +607,7 @@ function setupPinPad() {
 
   window.addEventListener('keydown', (e) => {
     const overlay = pinOverlay || document.getElementById('pinOverlay');
-    if (overlay && !overlay.classList.contains('unlocked')) {
+    if (overlay && !overlay.classList.contains('unlocked') && (!authOverlay || authOverlay.style.display === 'none')) {
       let digit = null;
       if (e.key >= '0' && e.key <= '9') {
         digit = e.key;
@@ -181,7 +618,7 @@ function setupPinPad() {
       if (digit !== null) {
         e.preventDefault();
         handlePinDigit(digit);
-        const btn = document.querySelector(`.pin-key[data-digit="${digit}"]`);
+        const btn = document.querySelector(`.pin-key:not(.setup-pin-key)[data-digit="${digit}"]`);
         if (btn) {
           btn.classList.add('active-press');
           setTimeout(() => btn.classList.remove('active-press'), 120);
@@ -189,11 +626,6 @@ function setupPinPad() {
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
         handlePinBackspace();
-        const bBtn = pinBackspaceBtn || document.getElementById('pinBackspaceBtn');
-        if (bBtn) {
-          bBtn.classList.add('active-press');
-          setTimeout(() => bBtn.classList.remove('active-press'), 120);
-        }
       } else if (e.key === 'Enter' && enteredPin.length === 4) {
         e.preventDefault();
         verifyPin();
@@ -224,15 +656,36 @@ function updatePinDotsUI() {
   });
 }
 
-function verifyPin() {
-  if      (enteredPin === '1470') loginUser('jisu');
-  else if (enteredPin === '3690') loginUser('jenu');
-  else showPinError();
+function clearPinFeedback() {
+  if (pinFeedback) { pinFeedback.textContent = ''; pinFeedback.classList.remove('visible'); }
 }
+
+async function verifyPin() {
+  const userToCheck = activeUser || (currentUserProfile ? currentUserProfile.username : null);
+  if (userToCheck) {
+    try {
+      const res = await authFetch('/api/auth/passkey/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userToCheck, passkey: enteredPin })
+      });
+      const data = await res.json();
+      if (res.ok && data.verified) {
+        unlockApp();
+        return;
+      }
+    } catch (e) {
+      console.warn('Passkey verification error:', e);
+    }
+  }
+
+  showPinError();
+}
+
 
 function showPinError() {
   if (pinDotsContainer) pinDotsContainer.classList.add('error');
-  if (pinFeedback) { pinFeedback.textContent = 'Incorrect PIN. Try again.'; pinFeedback.classList.add('visible'); }
+  if (pinFeedback) { pinFeedback.textContent = 'Incorrect passcode. Try again.'; pinFeedback.classList.add('visible'); }
   setTimeout(() => {
     enteredPin = '';
     updatePinDotsUI();
@@ -240,34 +693,23 @@ function showPinError() {
   }, 500);
 }
 
-function clearPinFeedback() {
-  if (pinFeedback) { pinFeedback.textContent = ''; pinFeedback.classList.remove('visible'); }
-}
-
-function loginUser(userKey) {
-  activeUser = userKey;
-  sessionStorage.setItem('chat_active_user', userKey);
-  const profile = USER_PROFILES[userKey];
-  currentPartner = { ...profile.opponent };
-
-  applyOpponentProfile(profile.opponent.avatar, profile.opponent.name);
-
-  // Render the chats overview list
-  renderChatsList();
-
-  // Show available chats list by default upon PIN enter
-  showChatsList();
+function unlockApp() {
+  enteredPin = '';
+  updatePinDotsUI();
+  clearPinFeedback();
 
   if (pinOverlay) pinOverlay.classList.add('unlocked');
+  hideAuthOverlay();
 
   getAudioContext();
   preloadKeypressSounds();
 
-  // Load chat history from server database immediately
-  loadChatHistory(userKey);
+  showChatsList();
+  fetchRegisteredUsers();
 
-  // Connect WebSocket
-  connectWebSocket(userKey);
+  if (activeUser) {
+    connectWebSocket(activeUser);
+  }
 }
 
 function lockApp() {
@@ -275,27 +717,22 @@ function lockApp() {
   if (chatInput) chatInput.blur();
   setTimeout(() => { isClosingByAvatarClick = false; }, 500);
 
-  if (isRecording) {
-    cancelVoiceRecording();
-  }
+  if (isRecording) cancelVoiceRecording();
   if (currentlyPlayingVoiceAudio) {
     try { currentlyPlayingVoiceAudio.pause(); } catch (_) {}
     currentlyPlayingVoiceAudio = null;
   }
+
   isManualDisconnect = true;
   disconnectWebSocket();
 
-  activeUser = null;
-  sessionStorage.removeItem('chat_active_user');
   enteredPin = '';
   updatePinDotsUI();
   clearPinFeedback();
 
   // Clear rendered message bubbles on lock
   document.querySelectorAll('#chatMessages .message-row').forEach(row => row.remove());
-  if (currentLiveIncomingRow) {
-    currentLiveIncomingRow = null;
-  }
+  if (currentLiveIncomingRow) currentLiveIncomingRow = null;
   lastOpponentTextLength = 0;
   lastConversationMessage = null;
   hideOpponentTyping();
@@ -308,8 +745,218 @@ function lockApp() {
 }
 
 // ─────────────────────────────────────────────────
-//  Dual-Screen Navigation & Chats Overview
+//  Multi-User Directory & Chats List Rendering
 // ─────────────────────────────────────────────────
+async function fetchRegisteredUsers() {
+  if (!activeUser) return;
+  try {
+    const res = await authFetch(`/api/users?current_user=${encodeURIComponent(activeUser)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.users && Array.isArray(data.users)) {
+        registeredUsersList = data.users.filter(u => u.username !== activeUser);
+        renderChatsList();
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching users:', err);
+  }
+}
+
+const FB_VERIFIED_BADGE_SVG = `
+  <svg class="fb-verified-badge" viewBox="0 0 24 24" aria-label="Verified Profile" title="Verified Profile">
+    <path fill="#1877F2" d="M12 2l2.4 2.1 3.2-.3 1.2 3 2.9 1.4-.8 3.1 1.8 2.6-2 2.5.3 3.2-3.1 1-1.6 2.8-3.1-.9-2.7 1.8-2.2-2.3-3.2.2-.8-3.1-2.8-1.5 1.1-3-1.6-2.7 2.1-2.4-.4-3.2 3.1-.9 1.5-2.8 3.1.9L12 2z"/>
+    <path fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12.3l2.4 2.4 5.1-5.1"/>
+  </svg>
+`;
+
+function renderChatsList() {
+  if (!chatsListContainer) return;
+
+  const count = registeredUsersList.length;
+  if (chatsCountBadge) chatsCountBadge.textContent = String(count);
+
+  if (count === 0) {
+    chatsListContainer.innerHTML = '';
+    if (chatsEmptyState) chatsEmptyState.style.display = 'flex';
+    return;
+  }
+
+  if (chatsEmptyState) chatsEmptyState.style.display = 'none';
+
+  chatsListContainer.innerHTML = registeredUsersList.map(user => {
+    const uname = user.username;
+    const isOnline = Boolean(user.is_online);
+    const lastMsg = user.last_message;
+    const timeText = lastMsg ? (lastMsg.client_time || formatTimeFromIso(lastMsg.created_at)) : (isOnline ? 'Online' : 'Active');
+    
+    let previewText = 'Tap to start conversation';
+    let isUnread = false;
+
+    if (lastMsg) {
+      const isOutgoing = lastMsg.sender === activeUser;
+      const prefix = isOutgoing ? 'You: ' : '';
+      if (lastMsg.msg_type === 'image') previewText = `${prefix}📷 Photo`;
+      else if (lastMsg.msg_type === 'voice') previewText = `${prefix}🎙️ Voice message`;
+      else previewText = `${prefix}${escapeHtml(lastMsg.text_content || '')}`;
+
+      if (!isOutgoing && !lastMsg.seen && currentView !== 'conversation') {
+        isUnread = true;
+      }
+    }
+
+    return `
+      <div class="chat-list-card" id="chatCard-${uname}" data-partner="${uname}">
+        <div class="chat-card-avatar-wrap">
+          <img class="chat-card-avatar" src="${user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(uname)}`}" alt="${user.display_name}">
+          <span class="chat-card-badge ${isOnline ? 'is-online' : ''}" id="chatCardBadge-${uname}"></span>
+        </div>
+        <div class="chat-card-body">
+          <div class="chat-card-row-top">
+            <div class="chat-card-name-wrap">
+              <span class="chat-card-name">${escapeHtml(user.display_name || uname)}</span>
+              ${FB_VERIFIED_BADGE_SVG}
+            </div>
+            <span class="chat-card-time" id="chatCardTime-${uname}">${timeText}</span>
+          </div>
+          <div class="chat-card-row-bottom">
+            <span class="chat-card-preview" id="chatCardPreview-${uname}">${previewText}</span>
+            <span class="chat-card-unread-dot" id="chatCardUnreadDot-${uname}" style="${isUnread ? 'display: block;' : 'display: none;'}"></span>
+          </div>
+        </div>
+        <svg class="chat-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+    `;
+
+  }).join('');
+
+  // Attach click listeners to cards
+  registeredUsersList.forEach(user => {
+    const card = document.getElementById(`chatCard-${user.username}`);
+    if (card) {
+      card.addEventListener('click', () => {
+        openConversationWith(user);
+      });
+    }
+  });
+}
+
+function openConversationWith(partner) {
+  currentPartner = {
+    key: partner.username,
+    name: partner.display_name || partner.username,
+    avatar: partner.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(partner.username)}`
+  };
+  isOpponentOnline = Boolean(partner.is_online);
+  opponentLastSeen = partner.last_seen;
+
+  applyOpponentProfile(currentPartner.avatar, currentPartner.name);
+
+  // Clear previous message DOM
+  document.querySelectorAll('#chatMessages .message-row').forEach(row => row.remove());
+  if (currentLiveIncomingRow) currentLiveIncomingRow = null;
+  lastOpponentTextLength = 0;
+  lastConversationMessage = null;
+  hideOpponentTyping();
+
+  // Load chat history for this user
+  loadChatHistory(partner.username);
+
+  // Query live presence
+  wsSend({ type: 'presence_check', partner: partner.username });
+
+  openConversation();
+}
+
+// ─────────────────────────────────────────────────
+//  User Directory & Profile Modals
+// ─────────────────────────────────────────────────
+function openUsersModal() {
+  if (!usersModal) return;
+  renderDirectoryList('');
+  usersModal.style.display = 'flex';
+}
+
+function closeUsersModal() {
+  if (usersModal) usersModal.style.display = 'none';
+}
+
+function renderDirectoryList(filter = '') {
+  if (!usersListContainer) return;
+  const q = filter.trim().toLowerCase();
+  const filtered = registeredUsersList.filter(u => {
+    return u.username.toLowerCase().includes(q) || (u.display_name && u.display_name.toLowerCase().includes(q));
+  });
+
+  if (filtered.length === 0) {
+    usersListContainer.innerHTML = '<div style="text-align: center; color: #94A3B8; padding: 20px; font-size: 13px;">No people found</div>';
+    return;
+  }
+
+  usersListContainer.innerHTML = filtered.map(u => `
+    <div class="user-dir-card" data-uname="${u.username}">
+      <div class="user-dir-avatar-wrap">
+        <img class="user-dir-avatar" src="${u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.username)}`}" alt="${u.display_name}">
+        <span class="user-dir-badge ${u.is_online ? 'is-online' : ''}"></span>
+      </div>
+      <div class="user-dir-info">
+        <div class="user-dir-name-row">
+          <span class="user-dir-name">${escapeHtml(u.display_name || u.username)}</span>
+          ${FB_VERIFIED_BADGE_SVG}
+        </div>
+        <span class="user-dir-username">@${escapeHtml(u.username)}</span>
+      </div>
+      <button type="button" class="user-dir-chat-btn">Chat</button>
+    </div>
+  `).join('');
+
+  usersListContainer.querySelectorAll('.user-dir-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const uname = card.dataset.uname;
+      const user = registeredUsersList.find(u => u.username === uname);
+      if (user) {
+        closeUsersModal();
+        openConversationWith(user);
+      }
+    });
+  });
+}
+
+function openProfileModal() {
+  if (!profileModal || !currentUserProfile) return;
+  if (profileMainAvatar) {
+    profileMainAvatar.src = currentUserProfile.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUserProfile.username)}`;
+  }
+  if (profileDisplayNameInput) {
+    profileDisplayNameInput.value = currentUserProfile.display_name || '';
+  }
+  if (profilePasskeyBtnText) {
+    profilePasskeyBtnText.textContent = currentUserProfile.has_passkey ? 'Change 4-Digit Passcode' : 'Set 4-Digit Passcode';
+  }
+  selectedProfileAvatar = currentUserProfile.avatar || '';
+  profileModal.style.display = 'flex';
+}
+
+function closeProfileModal() {
+  if (profileModal) profileModal.style.display = 'none';
+}
+
+async function logoutUser() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch (_) {}
+  localStorage.removeItem('chat_session_token');
+  sessionStorage.removeItem('chat_active_user');
+  activeUser = null;
+  currentUserProfile = null;
+  disconnectWebSocket();
+  closeProfileModal();
+  showAuthOverlay();
+  showToast('Logged out successfully', 'info');
+}
+
 function showChatsList() {
   currentView = 'chats';
   if (chatApp) {
@@ -364,73 +1011,123 @@ function getCardPreviewText() {
   return `${prefix}${escapeHtml(lastConversationMessage.text || '')}`;
 }
 
-function renderChatsList() {
-  if (!activeUser || !chatsListContainer) return;
-  const profile = USER_PROFILES[activeUser];
-  if (!profile) return;
+const userTypingTimers = new Map();
 
-  if (chatsUserAvatar) {
-    chatsUserAvatar.src = profile.avatar;
-  }
-  if (chatsUserSubtitle) {
-    chatsUserSubtitle.textContent = `Logged in as ${profile.userName}`;
+function updateUserTypingOnList(userKey, isTyping) {
+  if (!userKey) return;
+  const previewEl = document.getElementById(`chatCardPreview-${userKey}`);
+  if (!previewEl) return;
+
+  if (userTypingTimers.has(userKey)) {
+    clearTimeout(userTypingTimers.get(userKey));
+    userTypingTimers.delete(userKey);
   }
 
-  const partner = profile.opponent;
-  chatsListContainer.innerHTML = `
-    <div class="chat-list-card" id="chatCard-${partner.key}" data-partner="${partner.key}">
-      <div class="chat-card-avatar-wrap">
-        <img class="chat-card-avatar" src="${partner.avatar}" alt="${partner.name}">
-        <span class="chat-card-badge ${isOpponentOnline ? 'is-online' : ''}" id="chatCardBadge"></span>
-      </div>
-      <div class="chat-card-body">
-        <div class="chat-card-row-top">
-          <div class="chat-card-name-wrap">
-            <span class="chat-card-name">${partner.name}</span>
-            <span class="chat-card-verified-tag" title="Verified Connection">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-            </span>
-          </div>
-          <span class="chat-card-time" id="chatCardTime">${lastConversationMessage ? (lastConversationMessage.time || 'Now') : 'Active'}</span>
-        </div>
-        <div class="chat-card-row-bottom">
-          <span class="chat-card-preview" id="chatCardPreview">${getCardPreviewText()}</span>
-          <span class="chat-card-unread-dot" id="chatCardUnreadDot" style="${(lastConversationMessage && !lastConversationMessage.isOutgoing && !lastConversationMessage.isSeen && currentView !== 'conversation') ? 'display: block;' : 'display: none;'}"></span>
-        </div>
-      </div>
-      <svg class="chat-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 18 15 12 9 6"></polyline>
+  if (isTyping) {
+    previewEl.innerHTML = `
+      <span class="chat-card-typing-indicator">
+        <span class="chat-card-typing-dots">
+          <span class="chat-card-typing-dot"></span>
+          <span class="chat-card-typing-dot"></span>
+          <span class="chat-card-typing-dot"></span>
+        </span>
+        typing...
+      </span>
+    `;
+
+    const timer = setTimeout(() => {
+      userTypingTimers.delete(userKey);
+      restoreUserCardPreview(userKey);
+    }, 4500);
+    userTypingTimers.set(userKey, timer);
+  } else {
+    restoreUserCardPreview(userKey);
+  }
+}
+
+function restoreUserCardPreview(userKey) {
+  const previewEl = document.getElementById(`chatCardPreview-${userKey}`);
+  if (!previewEl) return;
+
+  if (currentPartner && currentPartner.key === userKey && lastConversationMessage) {
+    previewEl.innerHTML = getCardPreviewText();
+    return;
+  }
+
+  const u = registeredUsersList.find(item => item.username === userKey);
+  if (u && u.last_message) {
+    const lastMsg = u.last_message;
+    const isOutgoing = (lastMsg.sender === activeUser);
+    const prefix = isOutgoing ? 'You: ' : '';
+    if (lastMsg.msg_type === 'image') previewEl.textContent = `${prefix}📷 Photo`;
+    else if (lastMsg.msg_type === 'voice') previewEl.textContent = `${prefix}🎙️ Voice message`;
+    else previewEl.textContent = `${prefix}${lastMsg.text_content || ''}`;
+  } else {
+    previewEl.textContent = 'Tap to start conversation';
+  }
+}
+
+function getMessageStatusHtml(status = 'sent') {
+  if (status === 'pending') {
+    return `<span class="msg-status-badge status-pending" title="Sending...">
+      <svg class="status-icon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M8 5v3l2 1"/>
       </svg>
-    </div>
-  `;
+    </span>`;
+  }
+  if (status === 'sent') {
+    return `<span class="msg-status-badge status-sent" title="Sent">
+      <svg class="status-icon status-check-single" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.5 8.5l3 3 6.5-6.5"/>
+      </svg>
+    </span>`;
+  }
+  if (status === 'delivered') {
+    return `<span class="msg-status-badge status-delivered" title="Delivered">
+      <svg class="status-icon status-check-double" viewBox="0 0 18 14" width="16" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1.5 7.5l3 3 6.5-6.5"/>
+        <path d="M6 7.5l3 3 6.5-6.5"/>
+      </svg>
+    </span>`;
+  }
+  return `<span class="msg-status-badge status-seen" title="Seen">
+    <svg class="status-icon status-check-double" viewBox="0 0 18 14" width="16" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1.5 7.5l3 3 6.5-6.5"/>
+      <path d="M6 7.5l3 3 6.5-6.5"/>
+    </svg>
+  </span>`;
+}
 
-  const card = document.getElementById(`chatCard-${partner.key}`);
-  if (card) {
-    card.addEventListener('click', () => {
-      openConversation();
-    });
+function updateMessageDeliveryStatus(msgId, status) {
+  if (!msgId) return;
+  const row = document.querySelector(`#chatMessages .message-row[data-msg-id="${msgId}"]`) ||
+              document.querySelector(`#chatMessages .message-row[data-db-id="${msgId}"]`);
+  if (!row || !row.classList.contains('outgoing')) return;
+  const badgeWrap = row.querySelector('.msg-status-badge');
+  if (badgeWrap) {
+    badgeWrap.outerHTML = getMessageStatusHtml(status);
   }
 }
 
 function updateChatsListCardUI() {
-  const badge = document.getElementById('chatCardBadge');
+  if (!currentPartner.key) return;
+  const badge = document.getElementById(`chatCardBadge-${currentPartner.key}`);
   if (badge) {
     badge.classList.toggle('is-online', isOpponentOnline);
   }
 
-  const timeEl = document.getElementById('chatCardTime');
+  const timeEl = document.getElementById(`chatCardTime-${currentPartner.key}`);
   if (timeEl) {
-    timeEl.textContent = lastConversationMessage ? (lastConversationMessage.time || 'Now') : 'Active';
+    timeEl.textContent = lastConversationMessage ? (lastConversationMessage.time || 'Now') : (isOpponentOnline ? 'Online' : 'Active');
   }
 
-  const prevEl = document.getElementById('chatCardPreview');
-  if (prevEl) {
+  const prevEl = document.getElementById(`chatCardPreview-${currentPartner.key}`);
+  if (prevEl && !userTypingTimers.has(currentPartner.key)) {
     prevEl.innerHTML = getCardPreviewText();
   }
 
-  const dotEl = document.getElementById('chatCardUnreadDot');
+  const dotEl = document.getElementById(`chatCardUnreadDot-${currentPartner.key}`);
   if (dotEl) {
     const isUnread = (lastConversationMessage && !lastConversationMessage.isOutgoing && !lastConversationMessage.isSeen && currentView !== 'conversation');
     dotEl.style.display = isUnread ? 'block' : 'none';
@@ -439,33 +1136,28 @@ function updateChatsListCardUI() {
 
 function filterChatsList(query) {
   const q = (query || '').trim().toLowerCase();
-  const card = chatsListContainer ? chatsListContainer.querySelector('.chat-list-card') : null;
-  if (!card) return;
-
   if (chatsSearchClearBtn) {
     chatsSearchClearBtn.style.display = q ? 'block' : 'none';
   }
 
-  if (!q) {
-    card.style.display = 'flex';
-    if (chatsEmptyState) chatsEmptyState.style.display = 'none';
-    if (chatsCountBadge) chatsCountBadge.textContent = '1';
-    return;
-  }
+  const cards = chatsListContainer ? chatsListContainer.querySelectorAll('.chat-list-card') : [];
+  let visibleCount = 0;
 
-  const name = card.querySelector('.chat-card-name')?.textContent?.toLowerCase() || '';
-  const preview = card.querySelector('.chat-card-preview')?.textContent?.toLowerCase() || '';
+  cards.forEach(card => {
+    const name = card.querySelector('.chat-card-name')?.textContent?.toLowerCase() || '';
+    const preview = card.querySelector('.chat-card-preview')?.textContent?.toLowerCase() || '';
+    if (!q || name.includes(q) || preview.includes(q)) {
+      card.style.display = 'flex';
+      visibleCount++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
 
-  if (name.includes(q) || preview.includes(q)) {
-    card.style.display = 'flex';
-    if (chatsEmptyState) chatsEmptyState.style.display = 'none';
-    if (chatsCountBadge) chatsCountBadge.textContent = '1';
-  } else {
-    card.style.display = 'none';
-    if (chatsEmptyState) chatsEmptyState.style.display = 'flex';
-    if (chatsCountBadge) chatsCountBadge.textContent = '0';
-  }
+  if (chatsCountBadge) chatsCountBadge.textContent = String(visibleCount);
+  if (chatsEmptyState) chatsEmptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
 }
+
 
 // ─────────────────────────────────────────────────
 //  Chat History & Persistence
@@ -496,7 +1188,7 @@ function acknowledgeAllSeen(userKey) {
     user: userKey,
     opponent: currentPartner.key
   });
-  fetch('/api/messages/seen', {
+  authFetch('/api/messages/seen', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user: userKey, opponent: currentPartner.key, all: true })
@@ -511,7 +1203,7 @@ function notifyMessageSeen(messageId) {
     user: activeUser,
     opponent: currentPartner.key
   });
-  fetch('/api/messages/seen', {
+  authFetch('/api/messages/seen', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user: activeUser, opponent: currentPartner.key, ids: [messageId] })
@@ -520,9 +1212,8 @@ function notifyMessageSeen(messageId) {
 
 function markOutgoingMessagesSeen(targetMsgId = null, ids = null, isAll = false) {
   if (isAll) {
-    document.querySelectorAll('#chatMessages .message-row.outgoing .seen-dot').forEach(dot => {
-      dot.classList.add('is-seen');
-      dot.setAttribute('title', 'Seen');
+    document.querySelectorAll('#chatMessages .message-row.outgoing .msg-status-badge').forEach(badge => {
+      badge.outerHTML = getMessageStatusHtml('seen');
     });
     return;
   }
@@ -530,20 +1221,11 @@ function markOutgoingMessagesSeen(targetMsgId = null, ids = null, isAll = false)
   const idList = ids ? (Array.isArray(ids) ? ids : [ids]) : (targetMsgId ? [targetMsgId] : []);
   if (idList.length > 0) {
     idList.forEach(id => {
-      const row = document.querySelector(`#chatMessages .message-row[data-msg-id="${id}"]`) ||
-                  document.querySelector(`#chatMessages .message-row[data-db-id="${id}"]`);
-      if (row && row.classList.contains('outgoing')) {
-        const dot = row.querySelector('.seen-dot');
-        if (dot) {
-          dot.classList.add('is-seen');
-          dot.setAttribute('title', 'Seen');
-        }
-      }
+      updateMessageDeliveryStatus(id, 'seen');
     });
   } else {
-    document.querySelectorAll('#chatMessages .message-row.outgoing .seen-dot').forEach(dot => {
-      dot.classList.add('is-seen');
-      dot.setAttribute('title', 'Seen');
+    document.querySelectorAll('#chatMessages .message-row.outgoing .msg-status-badge').forEach(badge => {
+      badge.outerHTML = getMessageStatusHtml('seen');
     });
   }
 }
@@ -567,7 +1249,7 @@ async function refreshOpponentPresence() {
 async function loadChatHistory(userKey) {
   if (!userKey) return;
   try {
-    const res = await fetch(`/api/messages/${encodeURIComponent(userKey)}`);
+    const res = await authFetch(`/api/messages/${encodeURIComponent(userKey)}?user=${encodeURIComponent(activeUser || '')}`);
     if (!res.ok) return;
     const data = await res.json();
     if (!data.messages) return;
@@ -608,7 +1290,7 @@ async function loadChatHistory(userKey) {
     for (const msg of data.messages) {
       const dbIdStr = String(msg.id);
       const clientMsgIdStr = msg.client_msg_id ? String(msg.client_msg_id) : null;
-      const isOutgoing = msg.sender === userKey;
+      const isOutgoing = (msg.sender === activeUser);
       const type = isOutgoing ? 'outgoing' : 'incoming';
       const timeStr = msg.client_time || formatTimeFromIso(msg.created_at);
       const isSeen = Boolean(msg.seen);
@@ -639,10 +1321,9 @@ async function loadChatHistory(userKey) {
           matchingRow.dataset.msgId = clientMsgIdStr;
         }
         if (isOutgoing) {
-          const dot = matchingRow.querySelector('.seen-dot');
-          if (dot) {
-            dot.classList.toggle('is-seen', isSeen);
-            dot.setAttribute('title', isSeen ? 'Seen' : 'Sent');
+          const badgeWrap = matchingRow.querySelector('.msg-status-badge');
+          if (badgeWrap) {
+            badgeWrap.outerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
           }
         }
         continue;
@@ -683,7 +1364,7 @@ async function loadChatHistory(userKey) {
         msg_type: lastMsg.msg_type || 'chat',
         media_duration: lastMsg.media_duration,
         time: lastMsg.client_time || formatTimeFromIso(lastMsg.created_at),
-        isOutgoing: lastMsg.sender === userKey,
+        isOutgoing: (lastMsg.sender === activeUser),
         isSeen: Boolean(lastMsg.seen)
       };
       updateChatsListCardUI();
@@ -744,7 +1425,9 @@ function connectWebSocket(userKey) {
       });
     }
 
-    loadChatHistory(userKey);
+    if (currentPartner && currentPartner.key) {
+      loadChatHistory(currentPartner.key);
+    }
   };
 
   ws.onmessage = (event) => {
@@ -789,6 +1472,11 @@ function scheduleReconnect(userKey) {
 let offlineQueue = [];
 
 function wsSend(payload, shouldQueue = false) {
+  if (currentPartner && currentPartner.key) {
+    if (!payload.to) payload.to = currentPartner.key;
+    if (!payload.recipient) payload.recipient = currentPartner.key;
+    if (!payload.partner) payload.partner = currentPartner.key;
+  }
   if (ws && ws.readyState === WebSocket.OPEN) {
     try {
       ws.send(JSON.stringify(payload));
@@ -812,6 +1500,14 @@ function handleWsMessage(msg) {
     // ── Presence & Pong Heartbeat ─────────────────
     case 'presence':
     case 'pong':
+      if (msg.user) {
+        const u = registeredUsersList.find(item => item.username === msg.user);
+        if (u) {
+          if (msg.status !== undefined) u.is_online = msg.status === 'online';
+          if (msg.last_seen) u.last_seen = msg.last_seen;
+          updateChatsListCardUI();
+        }
+      }
       if (!msg.user || msg.user === currentPartner.key) {
         if (msg.status !== undefined) {
           isOpponentOnline = msg.status === 'online';
@@ -825,37 +1521,83 @@ function handleWsMessage(msg) {
 
     // ── Chat message ──────────────────────────────
     case 'chat':
-      receiveIncomingMessage(msg.text, msg.time, msg.id, msg.reply_to);
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        receiveIncomingMessage(msg.text, msg.time, msg.id, msg.reply_to);
+        notifyMessageSeen(msg.id);
+      } else {
+        const u = registeredUsersList.find(item => item.username === msg.from);
+        if (u) {
+          u.last_message = { text_content: msg.text, msg_type: 'chat', client_time: msg.time, seen: false, sender: msg.from };
+          renderChatsList();
+        }
+        showToast(`New message from ${u ? u.display_name : msg.from}`, 'info');
+      }
       break;
 
     // ── Voice note (Live WebSocket) ───────────────
     case 'voice':
-      receiveIncomingVoice(msg.audio, msg.duration, msg.time, msg.id, msg.waveform, msg.reply_to);
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        receiveIncomingVoice(msg.audio, msg.duration, msg.time, msg.id, msg.waveform, msg.reply_to);
+        notifyMessageSeen(msg.id);
+      } else {
+        const u = registeredUsersList.find(item => item.username === msg.from);
+        if (u) {
+          u.last_message = { msg_type: 'voice', client_time: msg.time, seen: false, sender: msg.from };
+          renderChatsList();
+        }
+        showToast(`Voice note from ${u ? u.display_name : msg.from}`, 'info');
+      }
       break;
 
     // ── Image message (Live WebSocket) ────────────
     case 'image':
-      receiveIncomingImage(msg.image, msg.time, msg.id, msg.reply_to);
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        receiveIncomingImage(msg.image, msg.time, msg.id, msg.reply_to);
+        notifyMessageSeen(msg.id);
+      } else {
+        const u = registeredUsersList.find(item => item.username === msg.from);
+        if (u) {
+          u.last_message = { msg_type: 'image', client_time: msg.time, seen: false, sender: msg.from };
+          renderChatsList();
+        }
+        showToast(`Photo from ${u ? u.display_name : msg.from}`, 'info');
+      }
+      break;
+
+    // ── Message Delivery Confirmation ─────────────
+    case 'msg_ack':
+      updateMessageDeliveryStatus(msg.id, msg.status || 'delivered');
       break;
 
     // ── Chat cleared ──────────────────────────────
     case 'chat_cleared':
-      clearChatDOM();
-      showToast('Chat history cleared', 'info');
+      if (!msg.from || msg.from === currentPartner.key) {
+        clearChatDOM();
+        showToast('Chat history cleared', 'info');
+      }
       break;
 
     // ── Live real-time typing preview ─────────────
     case 'live_typing':
-      handleOpponentLiveTyping(msg.text);
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        handleOpponentLiveTyping(msg.text);
+      }
+      updateUserTypingOnList(msg.from, Boolean(msg.text && msg.text.length > 0));
       break;
 
     // ── Typing indicators ─────────────────────────
     case 'typing_start':
-      showOpponentTyping();
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        showOpponentTyping();
+      }
+      updateUserTypingOnList(msg.from, true);
       break;
 
     case 'typing_stop':
-      hideOpponentLivePreview();
+      if (currentPartner && msg.from === currentPartner.key && currentView === 'conversation') {
+        hideOpponentLivePreview();
+      }
+      updateUserTypingOnList(msg.from, false);
       break;
 
     // ── Flying Balloon Emoji Reaction ─────────────
@@ -967,7 +1709,6 @@ function handleOpponentLiveTyping(text) {
       textNode.classList.remove('only-emojis', 'only-single-emoji');
     }
     textNode.innerHTML = renderEmojiHtml(text);
-    playOpponentLiveSound();
     scrollToBottom();
   }
 
@@ -1494,10 +2235,11 @@ function appendMessage(content, type = 'outgoing', timeStr = null, messageId = n
   bubble.appendChild(textSpan);
 
   if (type === 'outgoing') {
-    const seenDot = document.createElement('span');
-    seenDot.className = `seen-dot ${isSeen ? 'is-seen' : ''}`;
-    seenDot.setAttribute('title', isSeen ? 'Seen' : 'Sent');
-    bubble.appendChild(seenDot);
+    const statusWrap = document.createElement('div');
+    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    if (statusWrap.firstElementChild) {
+      bubble.appendChild(statusWrap.firstElementChild);
+    }
   }
 
   const timeEl = document.createElement('div');
@@ -1636,10 +2378,11 @@ function appendVoiceMessage(audioData, seconds, type = 'outgoing', timeStr = nul
   bubble.appendChild(voiceWrap.firstElementChild);
 
   if (type === 'outgoing') {
-    const seenDot = document.createElement('span');
-    seenDot.className = `seen-dot ${isSeen ? 'is-seen' : ''}`;
-    seenDot.setAttribute('title', isSeen ? 'Seen' : 'Sent');
-    bubble.appendChild(seenDot);
+    const statusWrap = document.createElement('div');
+    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    if (statusWrap.firstElementChild) {
+      bubble.appendChild(statusWrap.firstElementChild);
+    }
   }
 
   const timeEl = document.createElement('div');
@@ -1943,10 +2686,11 @@ function appendImageMessage(imageUrl, type = 'outgoing', timeStr = null, message
   bubble.appendChild(container);
 
   if (type === 'outgoing') {
-    const seenDot = document.createElement('span');
-    seenDot.className = `seen-dot ${isSeen ? 'is-seen' : ''}`;
-    seenDot.setAttribute('title', isSeen ? 'Seen' : 'Sent');
-    bubble.appendChild(seenDot);
+    const statusWrap = document.createElement('div');
+    statusWrap.innerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'sent');
+    if (statusWrap.firstElementChild) {
+      bubble.appendChild(statusWrap.firstElementChild);
+    }
   }
 
   const timeEl = document.createElement('div');
@@ -2438,18 +3182,11 @@ function setupEventListeners() {
     });
   }
 
-  // Input — send live typing events in real time & play keystroke audio
+  // Input — send live typing events in real time
   function sendLiveTypingEvent() {
     const rawVal = chatInput.value;
     updateActionBtnState();
-
-    // Play subtle typing sound for local keystrokes (at 50% volume)
-    if (rawVal.length !== lastLocalTextLength) {
-      if (rawVal.length > 0) {
-        playKeypressSound();
-      }
-      lastLocalTextLength = rawVal.length;
-    }
+    lastLocalTextLength = rawVal.length;
 
     // Stream keystrokes live to opponent before message is sent
     if (rawVal.length > 0) {
@@ -2588,24 +3325,85 @@ function setupEventListeners() {
     });
   }
 
-  // Clear chat (empties messages.json on PHP receiver and local DB)
+  // Clear chat (empties messages between users)
   if (clearChatBtn) {
     clearChatBtn.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to clear all chat messages? This will empty messages.json on the server.')) {
+      const partnerName = currentPartner.name || currentPartner.key || 'this user';
+      if (!confirm(`Are you sure you want to clear chat messages with ${partnerName}?`)) {
         return;
       }
       try {
-        const res = await fetch('/api/messages/clear', { method: 'POST' });
+        const res = await authFetch('/api/messages/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opponent: currentPartner.key })
+        });
         if (res.ok) {
           clearChatDOM();
-          showToast('Chat history cleared ✓', 'info');
+          showToast('Conversation cleared ✓', 'info');
         } else {
-          showToast('Failed to clear chat', 'error');
+          showToast('Failed to clear conversation', 'error');
         }
       } catch (err) {
         showToast('Error clearing chat', 'error');
       }
     });
+  }
+
+  // Multi-User Header & Directory Modals Listeners
+  if (chatsHeaderProfileTrigger) {
+    chatsHeaderProfileTrigger.addEventListener('click', openProfileModal);
+  }
+  if (chatsProfileBtn) {
+    chatsProfileBtn.addEventListener('click', openProfileModal);
+  }
+  if (chatsNewChatBtn) {
+    chatsNewChatBtn.addEventListener('click', openUsersModal);
+  }
+  if (chatsEmptyNewBtn) {
+    chatsEmptyNewBtn.addEventListener('click', openUsersModal);
+  }
+  if (usersModalCloseBtn) {
+    usersModalCloseBtn.addEventListener('click', closeUsersModal);
+  }
+  if (directorySearchInput) {
+    directorySearchInput.addEventListener('input', (e) => {
+      renderDirectoryList(e.target.value);
+    });
+  }
+  if (profileModalCloseBtn) {
+    profileModalCloseBtn.addEventListener('click', closeProfileModal);
+  }
+  if (profileSaveBtn) {
+    profileSaveBtn.addEventListener('click', async () => {
+      const name = profileDisplayNameInput ? profileDisplayNameInput.value.trim() : '';
+      if (!name) return;
+      try {
+        const res = await authFetch('/api/user/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_name: name, avatar: selectedProfileAvatar || currentUserProfile.avatar })
+        });
+        const data = await res.json();
+        if (res.ok && data.user) {
+          currentUserProfile = data.user;
+          initLoggedInSession(data.user);
+          closeProfileModal();
+          showToast('Profile updated ✓', 'info');
+        }
+      } catch (err) {
+        showToast('Error updating profile', 'error');
+      }
+    });
+  }
+  if (profileChangePasskeyBtn) {
+    profileChangePasskeyBtn.addEventListener('click', () => {
+      closeProfileModal();
+      openPasskeySetup(false);
+    });
+  }
+  if (profileLogoutBtn) {
+    profileLogoutBtn.addEventListener('click', logoutUser);
   }
 
   // Emoji button & popover handling (debounced to avoid opening and instantly closing)
@@ -2957,59 +3755,15 @@ function getOpponentGainNode(ctx) {
 }
 
 function playKeypressSound() {
-  if (!soundEnabled) return;
-  const now = performance.now();
-  if (now - lastLocalSoundPlayTime < 32) return;
-  lastLocalSoundPlayTime = now;
-
-  const ctx = getAudioContext();
-  let idx = Math.floor(Math.random() * SOUND_FILES.length);
-  if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
-  lastSoundIndex = idx;
-
-  if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
-    try {
-      const src = ctx.createBufferSource();
-      const gain = getLocalGainNode(ctx);
-      src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
-      src.connect(gain);
-      src.start(0);
-    } catch (_) { /* ignore */ }
-  } else if (fallbackAudio[idx]) {
-    try {
-      fallbackAudio[idx].currentTime = 0;
-      fallbackAudio[idx].play().catch(() => {});
-    } catch (_) {}
-  }
+  // Typing audio disabled: user requested visual indicators only without typing sounds
+  return;
 }
 
 const playOpponentKeypressSound = playKeypressSound;
 
 function playOpponentLiveSound() {
-  if (!soundEnabled) return;
-  const now = performance.now();
-  if (now - lastOpponentSoundPlayTime < 32) return;
-  lastOpponentSoundPlayTime = now;
-
-  const ctx = getAudioContext();
-  let idx = Math.floor(Math.random() * SOUND_FILES.length);
-  if (idx === lastSoundIndex) idx = (idx + 1) % SOUND_FILES.length;
-  lastSoundIndex = idx;
-
-  if (ctx && audioBuffersLoaded && KEYPRESS_AUDIO_BUFFERS[idx]) {
-    try {
-      const src = ctx.createBufferSource();
-      const gain = getOpponentGainNode(ctx);
-      src.buffer = KEYPRESS_AUDIO_BUFFERS[idx];
-      src.connect(gain);
-      src.start(0);
-    } catch (_) { /* ignore */ }
-  } else if (fallbackAudio[idx]) {
-    try {
-      fallbackAudio[idx].currentTime = 0;
-      fallbackAudio[idx].play().catch(() => {});
-    } catch (_) {}
-  }
+  // Typing audio disabled: user requested visual indicators only without typing sounds
+  return;
 }
 
 // ─────────────────────────────────────────────────
@@ -3260,7 +4014,7 @@ function sendFlyingEmojiBalloon(emojiChar) {
 // ─────────────────────────────────────────────────
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    if (activeUser) {
+    if (activeUser && pinOverlay && pinOverlay.classList.contains('unlocked')) {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         console.log('[App] Tab resumed — reconnecting WebSocket...');
         connectWebSocket(activeUser);
@@ -3274,7 +4028,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('focus', () => {
-  if (activeUser) {
+  if (activeUser && pinOverlay && pinOverlay.classList.contains('unlocked')) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       connectWebSocket(activeUser);
     }

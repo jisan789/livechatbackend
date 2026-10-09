@@ -1,113 +1,103 @@
 """
-LiveChat WebSocket Server
-FastAPI backend for real-time 2-user chat.
-Deploy on Render — reads PORT env variable automatically.
+LiveChat Server — Stateless Real-Time WebSockets Gateway & External PHP Storage Provider
+Optimized for zero-disk environments (Render, Cloud, Serverless).
 """
 
 import os
 import json
 import asyncio
-import datetime
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import datetime
+from contextlib import asynccontextmanager
+from typing import Optional, Dict, Any
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response
+from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from database import init_db, save_message, get_conversation, clear_messages, mark_messages_seen, update_user_last_seen, get_user_last_seen
+from fastapi.middleware.cors import CORSMiddleware
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("livechat")
+from app.config import STATIC_DIR, INDEX_FILE, PHP_STORAGE_URL
+from app.database import init_db
+from app.auth import (
+    extract_token_from_request,
+    verify_session_token,
+)
+from app.crud import (
+    update_user_presence,
+    get_user_presence,
+    get_conversation,
+    clear_conversation,
+)
+from app.websocket import (
+    connections,
+    safe_send,
+    send_to_user,
+    broadcast,
+    background_save_message,
+    background_mark_seen,
+)
+from app.routers import auth as auth_router
+from app.routers import users as users_router
+from app.routers import messages as messages_router
 
-app = FastAPI(title="LiveChat Server", version="1.0.0")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger("livechat.server")
 
-@app.on_event("startup")
-async def startup_event():
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifecycle: Stateless mode using external PHP storage."""
     init_db()
-    logger.info("[DB] SQLite database initialized.")
-
-# ─────────────────────────────────────────────────────────────
-#  Connection Registry
-# ─────────────────────────────────────────────────────────────
-VALID_USERS = {"jisu", "jenu"}
-OPPONENTS: dict[str, str] = {"jisu": "jenu", "jenu": "jisu"}
-
-# {user_key: WebSocket}
-connections: dict[str, WebSocket] = {}
+    logger.info(f"[Server] Stateless mode initialized. External storage target: {PHP_STORAGE_URL}")
+    yield
+    logger.info("[Server] Shutdown complete.")
 
 
-async def safe_send(ws: WebSocket, payload: dict) -> bool:
-    """Send JSON safely, returns False if the connection is broken."""
-    try:
-        await ws.send_json(payload)
-        return True
-    except Exception:
-        return False
+app = FastAPI(title="LiveChat Server", version="2.0.0", lifespan=lifespan)
 
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-async def notify_opponent(user_key: str, payload: dict):
-    """Forward a payload to the opponent if they are connected."""
-    opponent = OPPONENTS.get(user_key)
-    if opponent and opponent in connections:
-        ok = await safe_send(connections[opponent], payload)
-        if not ok:
-            connections.pop(opponent, None)
-
-
-async def background_save_message(user_key: str, opponent: str, msg_type: str, data: dict):
-    """Save message in the background without blocking real-time WebSocket communication."""
-    try:
-        if msg_type == "chat":
-            content = data.get("text")
-        elif msg_type == "image":
-            content = data.get("image")
-        else:
-            content = data.get("audio")
-        client_id = data.get("id") or data.get("client_msg_id")
-        saved = await asyncio.to_thread(
-            save_message,
-            sender=user_key,
-            recipient=opponent,
-            msg_type=msg_type,
-            text_content=content,
-            media_duration=data.get("duration"),
-            client_time=data.get("time"),
-            seen=False,
-            reply_to=data.get("reply_to"),
-            client_msg_id=client_id,
-        )
-        logger.info(f"[DB] Async saved {msg_type} #{saved.get('id')} from {user_key} to {opponent}")
-    except Exception as e:
-        logger.error(f"[DB] Error saving message in background: {e}")
-
-
-async def background_mark_seen(sender: str, recipient: str, ids: list | None = None):
-    """Persist seen status in background task without blocking."""
-    try:
-        await asyncio.to_thread(
-            mark_messages_seen,
-            sender=sender,
-            recipient=recipient,
-            msg_ids=ids,
-        )
-        logger.info(f"[DB] Async marked messages seen from {sender} to {recipient}")
-    except Exception as e:
-        logger.error(f"[DB] Error marking seen in background: {e}")
+# Include modular API routers
+app.include_router(auth_router.router)
+app.include_router(users_router.router)
+app.include_router(messages_router.router)
 
 
 # ─────────────────────────────────────────────────────────────
-#  WebSocket Endpoint
+# Helper: Presence Broadcast
+# ─────────────────────────────────────────────────────────────
+async def broadcast_presence(user_key: str, status: str, last_seen_iso: Optional[str] = None):
+    """Notify all connected clients about user presence changes."""
+    payload = {
+        "type": "presence",
+        "user": user_key,
+        "status": status,
+        "last_seen": last_seen_iso,
+    }
+    await broadcast(payload, exclude=user_key)
+
+
+# ─────────────────────────────────────────────────────────────
+# WebSocket Real-Time Chat & Media Endpoint
 # ─────────────────────────────────────────────────────────────
 @app.websocket("/ws/{user_key}")
 async def websocket_endpoint(websocket: WebSocket, user_key: str):
-    if user_key not in VALID_USERS:
-        await websocket.close(code=4001, reason="Unknown user")
+    user_key = user_key.strip().lower()
+    if not user_key:
+        await websocket.close(code=4001, reason="Invalid user key")
         return
 
     await websocket.accept()
 
-    # If user already has an active connection (e.g. page refresh),
-    # close the old one gracefully before replacing
+    # Gracefully replace existing connection if user reconnected or refreshed
     old_ws = connections.get(user_key)
     if old_ws is not None:
         try:
@@ -116,22 +106,12 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
             pass
 
     connections[user_key] = websocket
-    logger.info(f"[+] {user_key} connected  (total: {len(connections)})")
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+    logger.info(f"[+] {user_key} connected (total online: {len(connections)})")
 
-    opponent = OPPONENTS[user_key]
-    is_opp_online = opponent in connections
-    opp_last_seen = get_user_last_seen(opponent) if not is_opp_online else None
-
-    # Tell opponent this user is now online
-    await notify_opponent(user_key, {"type": "presence", "status": "online", "user": user_key})
-
-    # Tell this user whether opponent is already online & last seen
-    await safe_send(websocket, {
-        "type": "presence",
-        "status": "online" if is_opp_online else "offline",
-        "user": opponent,
-        "last_seen": opp_last_seen
-    })
+    # Broadcast online presence
+    await broadcast_presence(user_key, "online")
 
     try:
         while True:
@@ -142,136 +122,114 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
                 continue
 
             msg_type = data.get("type", "")
+            target_user = (data.get("to") or data.get("recipient") or "").strip().lower()
 
-            # 0. Heartbeat ping / presence check
+            # Heartbeat ping
             if msg_type in ("ping", "presence_check"):
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                asyncio.create_task(asyncio.to_thread(update_user_last_seen, user_key, now_iso))
-                opp_last = get_user_last_seen(opponent) if not (opponent in connections) else None
-                await safe_send(websocket, {
-                    "type": "pong" if msg_type == "ping" else "presence",
-                    "user": opponent,
-                    "status": "online" if (opponent in connections) else "offline",
-                    "last_seen": opp_last
-                })
+                asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+                partner = (data.get("partner") or "").strip().lower()
+                is_p_online = partner in connections if partner else False
+                p_last_seen = get_user_presence(partner) if partner and not is_p_online else None
+                await safe_send(
+                    websocket,
+                    {
+                        "type": "pong" if msg_type == "ping" else "presence",
+                        "user": partner,
+                        "status": "online" if is_p_online else "offline",
+                        "last_seen": p_last_seen,
+                    },
+                )
                 continue
 
-            # 1. Forward INSTANTLY over direct WebSocket (Zero Latency!)
+            # Forward message directly to recipient
             data["from"] = user_key
-            await notify_opponent(user_key, data)
+            is_delivered = False
+            if target_user:
+                is_delivered = await send_to_user(target_user, data)
 
-            # 2. Persist chat, voice & image messages to PHP/DB in background task without blocking live chat.
-            if msg_type in ("chat", "voice", "image"):
-                asyncio.create_task(background_save_message(user_key, opponent, msg_type, data))
+            # Instantly acknowledge message to sender for zero-latency delivery receipts
+            client_id = data.get("id") or data.get("client_msg_id")
+            if client_id and msg_type in ("chat", "voice", "image"):
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                asyncio.create_task(asyncio.to_thread(update_user_last_seen, user_key, now_iso))
+                await safe_send(
+                    websocket,
+                    {
+                        "type": "msg_ack",
+                        "id": client_id,
+                        "status": "delivered" if is_delivered else "sent",
+                        "server_time": now_iso,
+                    },
+                )
 
-            # 3. Persist seen status to PHP/DB in background task
-            if msg_type in ("seen", "mark_seen"):
+            # Persist chat, voice & image messages to external PHP server concurrently
+            if msg_type in ("chat", "voice", "image") and target_user:
+                asyncio.create_task(background_save_message(user_key, target_user, msg_type, data))
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+                asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+
+            # Forward seen event and persist seen status in background task
+            if msg_type in ("seen", "mark_seen") and target_user:
+                await send_to_user(target_user, data)
                 ids = data.get("ids") or ([data.get("msg_id")] if data.get("msg_id") else None)
                 is_all = data.get("all", False)
-                asyncio.create_task(background_mark_seen(sender=opponent, recipient=user_key, ids=None if is_all else ids))
-
-            logger.debug(f"  {user_key} → {opponent}: {msg_type}")
+                asyncio.create_task(
+                    background_mark_seen(sender=target_user, recipient=user_key, ids=None if is_all else ids)
+                )
 
     except WebSocketDisconnect:
-        # CRITICAL: Only remove from dict if THIS websocket is still the current one.
-        # If a new connection already replaced us, don't touch it.
         if connections.get(user_key) is websocket:
             connections.pop(user_key, None)
             now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-            update_user_last_seen(user_key, now_iso)
-            logger.info(f"[-] {user_key} disconnected (total: {len(connections)})")
-            await notify_opponent(user_key, {
-                "type": "presence",
-                "status": "offline",
-                "user": user_key,
-                "last_seen": now_iso
-            })
+            asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+            logger.info(f"[-] {user_key} disconnected (total online: {len(connections)})")
+            await broadcast_presence(user_key, "offline", now_iso)
         else:
-            logger.info(f"[-] {user_key} stale connection closed (replaced by newer)")
-
+            logger.info(f"[-] {user_key} stale connection closed")
 
 
 # ─────────────────────────────────────────────────────────────
-#  Message History & Presence Endpoints
+# Auxiliary Presence & Direct Message History Endpoints
 # ─────────────────────────────────────────────────────────────
 @app.get("/api/presence/{user_key}")
 async def api_get_presence(user_key: str):
-    if user_key not in VALID_USERS:
-        return JSONResponse({"status": "error", "message": "Unknown user"}, status_code=404)
-    opponent = OPPONENTS[user_key]
-    is_online = opponent in connections
-    last_seen = get_user_last_seen(opponent) if not is_online else None
+    user_key = user_key.strip().lower()
+    is_online = user_key in connections
+    last_seen = await asyncio.to_thread(get_user_presence, user_key) if not is_online else None
     return JSONResponse({
         "status": "ok",
         "user": user_key,
-        "opponent": opponent,
         "is_online": is_online,
-        "last_seen": last_seen
+        "last_seen": last_seen,
     })
 
 
-@app.get("/api/messages/{user_key}")
-async def get_messages(user_key: str):
-    if user_key not in VALID_USERS:
-        return JSONResponse({"status": "error", "message": "Unknown user"}, status_code=404)
-    opponent = OPPONENTS[user_key]
-    messages = get_conversation(user_key, opponent)
+@app.get("/api/messages/{opponent}")
+async def get_messages_opponent(opponent: str, request: Request):
+    opponent = opponent.strip().lower()
+    token = extract_token_from_request(request)
+    current_user = await asyncio.to_thread(verify_session_token, token) if token else None
+    user_key = current_user["username"] if current_user else request.query_params.get("user")
+
+    if not user_key:
+        return JSONResponse({"status": "error", "message": "User not authenticated"}, status_code=401)
+
+    messages = await asyncio.to_thread(get_conversation, user_key, opponent)
     is_online = opponent in connections
-    last_seen = get_user_last_seen(opponent) if not is_online else None
+    last_seen = await asyncio.to_thread(get_user_presence, opponent) if not is_online else None
+
     return JSONResponse({
         "status": "ok",
         "user": user_key,
         "opponent": opponent,
         "is_opponent_online": is_online,
         "opponent_last_seen": last_seen,
-        "messages": messages
+        "messages": messages,
     })
 
 
-@app.post("/api/messages/seen")
-async def api_mark_seen(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    user_key = body.get("user")
-    opponent = body.get("opponent") or (OPPONENTS.get(user_key) if user_key else None)
-    ids = body.get("ids")
-    is_all = body.get("all", False)
-    if not user_key or user_key not in VALID_USERS or not opponent:
-        return JSONResponse({"status": "error", "message": "Invalid user"}, status_code=400)
-
-    ok = await asyncio.to_thread(
-        mark_messages_seen,
-        sender=opponent,
-        recipient=user_key,
-        msg_ids=None if is_all else ids,
-    )
-
-    if opponent in connections:
-        await safe_send(connections[opponent], {
-            "type": "seen",
-            "from": user_key,
-            "ids": ids,
-            "all": is_all,
-        })
-
-    return JSONResponse({"status": "ok" if ok else "error"})
-
-
-@app.post("/api/messages/clear")
-async def api_clear_messages():
-    ok = clear_messages()
-    # Broadcast to all connected users that chat was cleared
-    for ukey, ws in list(connections.items()):
-        await safe_send(ws, {"type": "chat_cleared"})
-    return JSONResponse({"status": "ok" if ok else "error"})
-
-
 # ─────────────────────────────────────────────────────────────
-#  Health Check & Keep-Alive Ping
+# Health Check & Keep-Alive Ping
 # ─────────────────────────────────────────────────────────────
 @app.get("/ping")
 @app.get("/api/ping")
@@ -281,34 +239,47 @@ async def ping():
 
 @app.get("/health")
 async def health():
-    return JSONResponse({"status": "alive", "connected": list(connections.keys())})
+    return JSONResponse({
+        "status": "alive",
+        "online_users": list(connections.keys()),
+        "external_storage": PHP_STORAGE_URL,
+    })
 
 
 # ─────────────────────────────────────────────────────────────
-#  Static Files + SPA Catch-all
+# Static Files & SPA Delivery
 # ─────────────────────────────────────────────────────────────
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/app.js")
 async def serve_app_js():
-    return FileResponse("static/app.js", media_type="application/javascript", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return FileResponse(
+        str(STATIC_DIR / "app.js"),
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/style.css")
 async def serve_style_css():
-    return FileResponse("static/style.css", media_type="text/css", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return FileResponse(
+        str(STATIC_DIR / "style.css"),
+        media_type="text/css",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/")
 async def serve_root():
-    return FileResponse("index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return FileResponse(
+        str(INDEX_FILE),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
-# ─────────────────────────────────────────────────────────────
-#  Entry Point
-# ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

@@ -1,417 +1,56 @@
 """
-Database module for LiveChat
-Supports:
-1. External PHP JSON Receiver (via PHP_STORAGE_URL environment variable)
-2. Local SQLite fallback (livechat.db)
+Backwards-compatibility facade for LiveChat database module.
+Delegates directly to modular app.crud and app.auth.
 """
 
-import sqlite3
-import os
-import json
-import urllib.request
-import urllib.parse
-import logging
-from typing import List, Dict, Any, Optional
-
-logger = logging.getLogger("livechat.db")
-
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "livechat.db")
-PHP_STORAGE_URL = os.environ.get("PHP_STORAGE_URL", "http://cdn.jisanfx.top/chatdatabase/reciever.php").strip()
-
-
-def get_sqlite_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    """Initialize database tables and indexes (for SQLite)."""
-    if PHP_STORAGE_URL:
-        logger.info(f"[DB] Using external PHP JSON storage at {PHP_STORAGE_URL}")
-
-    try:
-        with get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL;")
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender TEXT NOT NULL,
-                    recipient TEXT NOT NULL,
-                    msg_type TEXT NOT NULL,
-                    text_content TEXT,
-                    media_duration REAL,
-                    client_time TEXT,
-                    seen INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            try:
-                cursor.execute("ALTER TABLE messages ADD COLUMN seen INTEGER DEFAULT 0;")
-            except Exception:
-                pass
-            try:
-                cursor.execute("ALTER TABLE messages ADD COLUMN reply_to TEXT;")
-            except Exception:
-                pass
-            try:
-                cursor.execute("ALTER TABLE messages ADD COLUMN client_msg_id TEXT;")
-            except Exception:
-                pass
-
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_messages_pair 
-                ON messages(sender, recipient);
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_messages_created 
-                ON messages(created_at);
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS seen_records (
-                    msg_id TEXT PRIMARY KEY,
-                    marked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS user_presence (
-                    user_key TEXT PRIMARY KEY,
-                    last_seen TEXT
-                );
-            """)
-            conn.commit()
-        logger.info("[DB] SQLite database initialized.")
-    except Exception as e:
-        logger.warning(f"[DB] SQLite init skipped or failed: {e}")
+from app.database import init_db
+from app.crud import (
+    register_user,
+    authenticate_user,
+    delete_session,
+    verify_session_token as verify_session,
+    set_user_passkey,
+    verify_user_passkey,
+    get_user_profile,
+    update_user_profile,
+    get_all_users,
+    update_user_presence as update_user_last_seen,
+    get_user_presence as get_user_last_seen,
+    save_message,
+    mark_messages_seen,
+    get_conversation,
+    clear_conversation,
+)
 
 
-def update_user_last_seen(user_key: str, last_seen_str: Optional[str] = None) -> bool:
-    """Record when a user was last active/seen."""
-    if not user_key:
+def clear_messages(user1=None, user2=None) -> bool:
+    """
+    Safely clear messages between two users directly on external server.
+    CRITICAL: Never clears all messages or the entire database.
+    Both users must be specified.
+    """
+    if not user1 or not user2:
         return False
-    if not last_seen_str:
-        import datetime
-        last_seen_str = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-
-    # If PHP_STORAGE_URL is configured, push to PHP storage presence endpoint
-    if PHP_STORAGE_URL:
-        try:
-            payload = {
-                "action": "presence_update",
-                "user": user_key,
-                "last_seen": last_seen_str,
-            }
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                PHP_STORAGE_URL,
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "LiveChat-Server/1.0"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                pass
-        except Exception as e:
-            logger.debug(f"[DB] PHP presence update skipped ({e})")
-
-    try:
-        with get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO user_presence (user_key, last_seen)
-                VALUES (?, ?)
-                ON CONFLICT(user_key) DO UPDATE SET last_seen = excluded.last_seen;
-                """,
-                (user_key, last_seen_str),
-            )
-            conn.commit()
-            return True
-    except Exception as e:
-        logger.error(f"[DB] Error updating user last seen for {user_key}: {e}")
-        return False
+    ok, _ = clear_conversation(user1, user2)
+    return ok
 
 
-def get_user_last_seen(user_key: str) -> Optional[str]:
-    """Retrieve the last seen ISO timestamp for a user."""
-    if not user_key:
-        return None
-
-    # Check external PHP storage first if configured
-    if PHP_STORAGE_URL:
-        try:
-            params = urllib.parse.urlencode({
-                "action": "presence_get",
-                "user": user_key
-            })
-            url = f"{PHP_STORAGE_URL}?{params}"
-            req = urllib.request.Request(url, headers={"User-Agent": "LiveChat-Server/1.0"})
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                if result.get("status") == "ok" and result.get("last_seen"):
-                    return result["last_seen"]
-        except Exception as e:
-            logger.debug(f"[DB] PHP get presence skipped ({e})")
-
-    try:
-        with get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT last_seen FROM user_presence WHERE user_key = ?", (user_key,))
-            row = cursor.fetchone()
-            if row and row["last_seen"]:
-                return row["last_seen"]
-            # Fallback: check most recent message sent by this user
-            cursor.execute("SELECT created_at FROM messages WHERE sender = ? ORDER BY id DESC LIMIT 1", (user_key,))
-            msg_row = cursor.fetchone()
-            if msg_row and msg_row["created_at"]:
-                return str(msg_row["created_at"])
-    except Exception as e:
-        logger.error(f"[DB] Error getting user last seen for {user_key}: {e}")
-
-    # Fallback to current UTC timestamp so a specific time is always available
-    import datetime
-    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def save_message(
-    sender: str,
-    recipient: str,
-    msg_type: str,
-    text_content: Optional[str] = None,
-    media_duration: Optional[float] = None,
-    client_time: Optional[str] = None,
-    seen: bool = False,
-    reply_to: Optional[Any] = None,
-    client_msg_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Persist a message to PHP endpoint or SQLite."""
-    payload = {
-        "sender": sender,
-        "recipient": recipient,
-        "msg_type": msg_type,
-        "text_content": text_content,
-        "audio": text_content if msg_type == "voice" else None,
-        "image": text_content if msg_type == "image" else None,
-        "media_duration": media_duration,
-        "client_time": client_time,
-        "client_msg_id": client_msg_id,
-        "seen": seen,
-        "reply_to": reply_to,
-    }
-
-    # If PHP_STORAGE_URL is configured, send HTTP POST to PHP receiver
-    if PHP_STORAGE_URL:
-        try:
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                PHP_STORAGE_URL,
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "LiveChat-Server/1.0"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                if result.get("status") == "ok" and "data" in result:
-                    return result["data"]
-        except Exception as e:
-            logger.error(f"[DB] Failed to save to PHP storage ({e}). Falling back to SQLite.")
-
-    # SQLite fallback
-    with get_sqlite_connection() as conn:
-        cursor = conn.cursor()
-        reply_to_str = json.dumps(reply_to) if isinstance(reply_to, (dict, list)) else (str(reply_to) if reply_to else None)
-        cursor.execute(
-            """
-            INSERT INTO messages (sender, recipient, msg_type, text_content, media_duration, client_time, seen, reply_to, client_msg_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (sender, recipient, msg_type, text_content, media_duration, client_time, 1 if seen else 0, reply_to_str, client_msg_id),
-        )
-        msg_id = cursor.lastrowid
-        conn.commit()
-
-        cursor.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
-        row = cursor.fetchone()
-        if row:
-            d = dict(row)
-            d["seen"] = bool(d.get("seen", 0))
-            if d.get("reply_to") and isinstance(d["reply_to"], str):
-                try:
-                    d["reply_to"] = json.loads(d["reply_to"])
-                except Exception:
-                    pass
-            return d
-        return {
-            "id": msg_id,
-            "sender": sender,
-            "recipient": recipient,
-            "msg_type": msg_type,
-            "text_content": text_content,
-            "media_duration": media_duration,
-            "client_time": client_time,
-            "client_msg_id": client_msg_id,
-            "seen": seen,
-            "reply_to": reply_to,
-        }
-
-
-def mark_messages_seen(sender: str, recipient: str, msg_ids: Optional[List[Any]] = None) -> bool:
-    """Mark messages sent by sender to recipient as seen on external PHP storage & local SQLite."""
-    php_success = False
-    if PHP_STORAGE_URL:
-        try:
-            payload = {
-                "action": "seen",
-                "sender": sender,
-                "recipient": recipient,
-                "ids": msg_ids or [],
-            }
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                PHP_STORAGE_URL,
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "LiveChat-Server/1.0"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                if result.get("status") == "ok":
-                    php_success = True
-                    logger.info(f"[DB] Marked messages as seen in PHP storage (updated: {result.get('updated')})")
-        except Exception as e:
-            logger.error(f"[DB] Failed to mark messages seen in PHP storage: {e}")
-
-    # SQLite fallback update
-    try:
-        with get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            if msg_ids:
-                for mid in msg_ids:
-                    cursor.execute("INSERT OR IGNORE INTO seen_records (msg_id) VALUES (?)", (str(mid),))
-                placeholders = ",".join("?" for _ in msg_ids)
-                cursor.execute(
-                    f"UPDATE messages SET seen = 1 WHERE id IN ({placeholders})",
-                    tuple(msg_ids),
-                )
-            elif sender and recipient:
-                cursor.execute(
-                    "UPDATE messages SET seen = 1 WHERE sender = ? AND recipient = ?",
-                    (sender, recipient),
-                )
-            elif recipient:
-                cursor.execute(
-                    "UPDATE messages SET seen = 1 WHERE recipient = ?",
-                    (recipient,),
-                )
-            conn.commit()
-    except Exception as e:
-        logger.error(f"[DB] SQLite mark seen error: {e}")
-
-    return php_success
-
-
-def get_conversation(user1: str, user2: str, limit: int = 200) -> List[Dict[str, Any]]:
-    """Fetch messages exchanged between user1 and user2."""
-    if PHP_STORAGE_URL:
-        try:
-            params = urllib.parse.urlencode({
-                "action": "get",
-                "user1": user1,
-                "user2": user2
-            })
-            url = f"{PHP_STORAGE_URL}?{params}"
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "LiveChat-Server/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                if result.get("status") == "ok" and "messages" in result:
-                    msgs = result["messages"]
-                    seen_id_set = set()
-                    try:
-                        with get_sqlite_connection() as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT msg_id FROM seen_records")
-                            seen_id_set = {str(row[0]) for row in cursor.fetchall()}
-                    except Exception:
-                        pass
-
-                    total = len(msgs)
-                    for i, m in enumerate(msgs):
-                        m_id = str(m.get("id", ""))
-                        if m.get("seen") is True or m_id in seen_id_set:
-                            m["seen"] = True
-                        else:
-                            # If recipient replied after this message, it was seen!
-                            recipient = m.get("recipient")
-                            has_reply = any(msgs[j].get("sender") == recipient for j in range(i + 1, total))
-                            m["seen"] = has_reply
-                    return msgs
-        except Exception as e:
-            logger.error(f"[DB] Failed to get messages from PHP storage ({e}). Falling back to SQLite.")
-
-    # SQLite fallback
-    with get_sqlite_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT * FROM (
-                SELECT * FROM messages
-                WHERE (sender = ? AND recipient = ?)
-                   OR (sender = ? AND recipient = ?)
-                ORDER BY id DESC
-                LIMIT ?
-            ) ORDER BY id ASC;
-            """,
-            (user1, user2, user2, user1, limit),
-        )
-        rows = cursor.fetchall()
-        result_list = []
-        for row in rows:
-            d = dict(row)
-            d["seen"] = bool(d.get("seen", 0))
-            if d.get("reply_to") and isinstance(d["reply_to"], str):
-                try:
-                    d["reply_to"] = json.loads(d["reply_to"])
-                except Exception:
-                    pass
-            result_list.append(d)
-        return result_list
-
-
-def clear_messages() -> bool:
-    """Clear all messages from PHP storage and local SQLite."""
-    success = False
-    if PHP_STORAGE_URL:
-        try:
-            sep = "&" if "?" in PHP_STORAGE_URL else "?"
-            url = f"{PHP_STORAGE_URL}{sep}action=clear"
-            req = urllib.request.Request(url, headers={"User-Agent": "LiveChat-Server/1.0"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                if result.get("status") == "ok":
-                    success = True
-                    logger.info("[DB] Cleared PHP storage messages.json.")
-        except Exception as e:
-            logger.error(f"[DB] Error clearing PHP storage ({e})")
-
-    try:
-        with get_sqlite_connection() as conn:
-            conn.execute("DELETE FROM messages;")
-            conn.commit()
-        success = True
-        logger.info("[DB] Cleared SQLite messages.")
-    except Exception as e:
-        logger.error(f"[DB] Error clearing SQLite messages: {e}")
-
-    return success
+__all__ = [
+    "init_db",
+    "verify_session",
+    "register_user",
+    "authenticate_user",
+    "delete_session",
+    "set_user_passkey",
+    "verify_user_passkey",
+    "get_user_profile",
+    "update_user_profile",
+    "get_all_users",
+    "update_user_last_seen",
+    "get_user_last_seen",
+    "save_message",
+    "mark_messages_seen",
+    "get_conversation",
+    "clear_messages",
+    "clear_conversation",
+]
