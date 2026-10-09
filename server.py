@@ -275,7 +275,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.get("/app.js")
 async def serve_app_js():
     return FileResponse(
-        str(STATIC_DIR / "app.js"),
+        str(STATIC_DIR / "js" / "app.js"),
         media_type="application/javascript",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )

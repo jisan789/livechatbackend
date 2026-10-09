@@ -1,0 +1,50 @@
+/* LiveChat — Master Modular CSS Entrypoint
+   Google / Facebook / Gemini High-Performance Architecture
+   Enforces strict layer containment & eliminates background GPU compositing lag */
+
+@import url('../style.css');
+
+/* ══════════════════════════════════════════════════════════
+   HIGH-PERFORMANCE VIRTUAL DOM & MODAL CONTAINMENT
+   Completely unloads off-screen/closed overlays from rendering & GPU memory
+   ══════════════════════════════════════════════════════════ */
+.pin-overlay[style*="display: none"],
+.auth-overlay[style*="display: none"],
+.passkey-setup-modal[style*="display: none"],
+.profile-modal[style*="display: none"],
+.users-modal[style*="display: none"],
+.image-lightbox[style*="display: none"],
+.emoji-popover[style*="display: none"] {
+  content-visibility: hidden;
+  contain: strict;
+  pointer-events: none !important;
+  will-change: auto;
+}
+
+/* Hardware accelerated layer isolation */
+.chat-app {
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.chat-messages {
+  contain: layout style;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chats-list-container {
+  contain: layout style;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Micro-optimized touch response */
+button, 
+.action-icon-btn, 
+.chat-card-item, 
+.voice-play-btn, 
+.pin-key-btn {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
