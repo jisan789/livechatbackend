@@ -108,7 +108,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
 
     connections[user_key] = websocket
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-    asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+    asyncio.create_task(run_in_thread(update_user_presence, user_key, now_iso))
     logger.info(f"[+] {user_key} connected (total online: {len(connections)})")
 
     # Broadcast online presence
@@ -128,7 +128,7 @@ async def websocket_endpoint(websocket: WebSocket, user_key: str):
             # Heartbeat ping
             if msg_type in ("ping", "presence_check"):
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                asyncio.create_task(asyncio.to_thread(update_user_presence, user_key, now_iso))
+                asyncio.create_task(run_in_thread(update_user_presence, user_key, now_iso))
                 partner = (data.get("partner") or "").strip().lower()
                 is_p_online = partner in connections if partner else False
                 p_last_seen = get_user_presence(partner) if partner and not is_p_online else None

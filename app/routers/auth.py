@@ -1,6 +1,7 @@
 import asyncio
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
+from app.async_utils import run_in_thread
 from app.auth import (
     is_https_request,
     set_session_cookie,
@@ -33,7 +34,7 @@ async def api_register(request: Request, response: Response):
     avatar = data.get("avatar", "").strip()
     passkey = data.get("passkey", "").strip()
 
-    user, token, err = await asyncio.to_thread(
+    user, token, err = await run_in_thread(
         register_user,
         username=username,
         password=password,
@@ -67,7 +68,7 @@ async def api_login(request: Request, response: Response):
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
 
-    user, token, err = await asyncio.to_thread(authenticate_user, username, password)
+    user, token, err = await run_in_thread(authenticate_user, username, password)
     if err or not user:
         return JSONResponse({"status": "error", "message": err or "Invalid credentials"}, status_code=401)
 
@@ -87,7 +88,7 @@ async def api_login(request: Request, response: Response):
 async def api_logout(request: Request, response: Response):
     token = extract_token_from_request(request)
     if token:
-        await asyncio.to_thread(delete_session, token)
+        await run_in_thread(delete_session, token)
     clear_session_cookie(response)
     return {"status": "ok", "message": "Logged out"}
 
@@ -98,7 +99,7 @@ async def api_get_me(request: Request):
     if not token:
         return JSONResponse({"status": "unauthorized", "user": None}, status_code=401)
 
-    user = await asyncio.to_thread(verify_session_token, token)
+    user = await run_in_thread(verify_session_token, token)
     if not user:
         return JSONResponse({"status": "unauthorized", "user": None}, status_code=401)
 
@@ -108,7 +109,7 @@ async def api_get_me(request: Request):
 @router.post("/passkey/setup")
 async def api_set_passkey(request: Request):
     token = extract_token_from_request(request)
-    user = await asyncio.to_thread(verify_session_token, token) if token else None
+    user = await run_in_thread(verify_session_token, token) if token else None
 
     try:
         data = await request.json()
@@ -123,7 +124,7 @@ async def api_set_passkey(request: Request):
     if len(passkey) != 4 or not passkey.isdigit():
         return JSONResponse({"status": "error", "message": "Passkey must be a 4-digit number"}, status_code=400)
 
-    ok = await asyncio.to_thread(set_user_passkey, username, passkey)
+    ok = await run_in_thread(set_user_passkey, username, passkey)
     if ok:
         return {"status": "ok", "message": "Passkey configured successfully"}
     return JSONResponse({"status": "error", "message": "Could not set passkey"}, status_code=500)
@@ -142,8 +143,8 @@ async def api_verify_passkey(request: Request):
     if not username or not passkey:
         return JSONResponse({"status": "error", "message": "Missing username or passkey"}, status_code=400)
 
-    valid = await asyncio.to_thread(verify_user_passkey, username, passkey)
+    valid = await run_in_thread(verify_user_passkey, username, passkey)
     if valid:
-        profile = await asyncio.to_thread(get_user_profile, username)
+        profile = await run_in_thread(get_user_profile, username)
         return {"status": "ok", "verified": True, "user": profile}
     return JSONResponse({"status": "error", "verified": False, "message": "Incorrect passcode"}, status_code=400)
