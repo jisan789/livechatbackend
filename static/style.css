@@ -158,8 +158,9 @@ button, input, textarea, select {
   -webkit-backface-visibility: hidden;
   perspective: 1000px;
   -webkit-perspective: 1000px;
-  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.20s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  contain: layout style;
 }
 
 .chats-screen {
@@ -176,7 +177,7 @@ button, input, textarea, select {
 }
 
 .chat-app.in-chat .chats-screen {
-  transform: translate3d(-24%, 0, 0);
+  transform: translate3d(-18%, 0, 0);
   pointer-events: none;
 }
 

@@ -150,6 +150,7 @@ let isOpponentOnline    = false;
 let opponentLastSeen    = null;
 let currentView         = 'chats'; // 'chats' | 'conversation'
 let lastConversationMessage = null;
+const conversationMessagesCache = new Map();
 
 // Passkey setup flow state
 let passkeySetupStep = 1; // 1 = enter pin, 2 = confirm pin
@@ -868,6 +869,12 @@ function openConversationWith(partner) {
     updateActionBtnState();
   }
 
+  // Pre-render cached messages immediately on frame 0 so transition has zero blank flicker!
+  if (conversationMessagesCache.has(partner.username)) {
+    renderChatHistoryMessages(conversationMessagesCache.get(partner.username));
+    scrollToBottom(true);
+  }
+
   // 1. Immediately trigger hardware slide transition with zero delay
   openConversation();
 
@@ -875,7 +882,7 @@ function openConversationWith(partner) {
   setTimeout(() => {
     loadChatHistory(partner.username);
     wsSend({ type: 'presence_check', partner: partner.username });
-  }, 40);
+  }, 10);
 }
 
 // ─────────────────────────────────────────────────
@@ -959,6 +966,7 @@ async function logoutUser() {
   sessionStorage.removeItem('chat_active_user');
   activeUser = null;
   currentUserProfile = null;
+  conversationMessagesCache.clear();
   disconnectWebSocket();
   closeProfileModal();
   showAuthOverlay();
@@ -1000,7 +1008,7 @@ function showChatsList() {
 
   setTimeout(() => {
     isClosingByAvatarClick = false;
-  }, 400);
+  }, 250);
 }
 
 function openConversation() {
@@ -1021,7 +1029,7 @@ function openConversation() {
         updateChatsListCardUI();
       }
     }
-  }, 280);
+  }, 210);
 }
 
 function getCardPreviewText() {
@@ -1236,6 +1244,10 @@ function markOutgoingMessagesSeen(targetMsgId = null, ids = null, isAll = false)
     document.querySelectorAll('#chatMessages .message-row.outgoing .msg-status-badge').forEach(badge => {
       badge.outerHTML = getMessageStatusHtml('seen');
     });
+    if (currentPartner && currentPartner.key && conversationMessagesCache.has(currentPartner.key)) {
+      const cached = conversationMessagesCache.get(currentPartner.key);
+      cached.forEach(m => { if (m.sender === activeUser) m.seen = true; });
+    }
     return;
   }
 
@@ -1244,10 +1256,22 @@ function markOutgoingMessagesSeen(targetMsgId = null, ids = null, isAll = false)
     idList.forEach(id => {
       updateMessageDeliveryStatus(id, 'seen');
     });
+    if (currentPartner && currentPartner.key && conversationMessagesCache.has(currentPartner.key)) {
+      const cached = conversationMessagesCache.get(currentPartner.key);
+      cached.forEach(m => {
+        if (idList.includes(m.client_msg_id) || idList.includes(String(m.id)) || idList.includes(m.id)) {
+          m.seen = true;
+        }
+      });
+    }
   } else {
     document.querySelectorAll('#chatMessages .message-row.outgoing .msg-status-badge').forEach(badge => {
       badge.outerHTML = getMessageStatusHtml('seen');
     });
+    if (currentPartner && currentPartner.key && conversationMessagesCache.has(currentPartner.key)) {
+      const cached = conversationMessagesCache.get(currentPartner.key);
+      cached.forEach(m => { if (m.sender === activeUser) m.seen = true; });
+    }
   }
 }
 
@@ -1267,6 +1291,133 @@ async function refreshOpponentPresence() {
   } catch (_) {}
 }
 
+function renderChatHistoryMessages(messages) {
+  if (!messages || !Array.isArray(messages)) return null;
+
+  // Index all existing rows in DOM by:
+  // 1. data-msg-id (client assigned ID)
+  // 2. data-db-id (server DB integer ID)
+  // 3. Content signature: sender|time|snippet
+  const existingMsgRows = document.querySelectorAll('#chatMessages .message-row');
+  const existingIdMap = new Map();
+  const existingSigMap = new Map();
+
+  existingMsgRows.forEach(row => {
+    const mId = row.dataset.msgId;
+    const dbId = row.dataset.dbId;
+    if (mId) existingIdMap.set(String(mId), row);
+    if (dbId) existingIdMap.set(String(dbId), row);
+
+    const senderType = row.classList.contains('outgoing') ? 'outgoing' : 'incoming';
+    const timeEl = row.querySelector('.message-time');
+    const timeStr = timeEl ? timeEl.textContent.trim() : '';
+    const textEl = row.querySelector('.bubble-text-content') || row.querySelector('.bubble');
+    let textSnippet = '';
+    if (textEl) {
+      const clone = textEl.cloneNode(true);
+      clone.querySelectorAll('.seen-dot, .reply-quote-chip').forEach(el => el.remove());
+      textSnippet = clone.textContent.trim().substring(0, 40);
+    }
+    if (textSnippet || timeStr) {
+      const sig = `${senderType}|${timeStr}|${textSnippet}`;
+      existingSigMap.set(sig, row);
+    }
+  });
+
+  let appendedAny = false;
+  let hadIncoming = false;
+
+  for (const msg of messages) {
+    const dbIdStr = String(msg.id);
+    const clientMsgIdStr = msg.client_msg_id ? String(msg.client_msg_id) : null;
+    const isOutgoing = (msg.sender === activeUser);
+    const type = isOutgoing ? 'outgoing' : 'incoming';
+    const timeStr = msg.client_time || formatTimeFromIso(msg.created_at);
+    const isSeen = Boolean(msg.seen);
+
+    if (!isOutgoing) {
+      hadIncoming = true;
+    }
+
+    // Check if this message already exists in DOM
+    let matchingRow = null;
+    if (clientMsgIdStr && existingIdMap.has(clientMsgIdStr)) {
+      matchingRow = existingIdMap.get(clientMsgIdStr);
+    } else if (existingIdMap.has(dbIdStr)) {
+      matchingRow = existingIdMap.get(dbIdStr);
+    } else {
+      const textContent = msg.text_content || '';
+      const textSnippet = msg.msg_type === 'chat' ? textContent.trim().substring(0, 40) : '';
+      const sig = `${type}|${timeStr}|${textSnippet}`;
+      if (textSnippet && existingSigMap.has(sig)) {
+        matchingRow = existingSigMap.get(sig);
+      }
+    }
+
+    if (matchingRow) {
+      // Message already exists in DOM: cleanly sync DB id and seen status without re-appending!
+      matchingRow.dataset.dbId = dbIdStr;
+      if (clientMsgIdStr && !matchingRow.dataset.msgId) {
+        matchingRow.dataset.msgId = clientMsgIdStr;
+      }
+      if (isOutgoing) {
+        const badgeWrap = matchingRow.querySelector('.msg-status-badge');
+        if (badgeWrap) {
+          badgeWrap.outerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'delivered');
+        }
+      }
+      continue;
+    }
+
+    let replyToData = msg.reply_to || null;
+    if (replyToData && typeof replyToData === 'string') {
+      try {
+        replyToData = JSON.parse(replyToData);
+      } catch (_) {}
+    }
+
+    const assignedMsgId = clientMsgIdStr || ('msg_' + dbIdStr);
+    const deliveryStatus = isSeen ? 'seen' : 'delivered';
+
+    if (msg.msg_type === 'chat') {
+      appendMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
+      appendedAny = true;
+    } else if (msg.msg_type === 'voice' && msg.text_content) {
+      appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, deliveryStatus, true, replyToData);
+      appendedAny = true;
+    } else if (msg.msg_type === 'image' && msg.text_content) {
+      appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
+      appendedAny = true;
+    }
+
+    const newlyCreatedRow = document.querySelector(`#chatMessages .message-row[data-msg-id="${assignedMsgId}"]`);
+    if (newlyCreatedRow) {
+      newlyCreatedRow.dataset.dbId = dbIdStr;
+      existingIdMap.set(assignedMsgId, newlyCreatedRow);
+      existingIdMap.set(dbIdStr, newlyCreatedRow);
+    }
+  }
+
+  if (messages.length > 0) {
+    const lastMsg = messages[messages.length - 1];
+    lastConversationMessage = {
+      text: lastMsg.text_content || '',
+      msg_type: lastMsg.msg_type || 'chat',
+      media_duration: lastMsg.media_duration,
+      time: lastMsg.client_time || formatTimeFromIso(lastMsg.created_at),
+      isOutgoing: (lastMsg.sender === activeUser),
+      isSeen: Boolean(lastMsg.seen)
+    };
+    updateChatsListCardUI();
+  }
+
+  if (appendedAny) {
+    scrollToBottom();
+  }
+
+  return { appendedAny, hadIncoming };
+}
+
 async function loadChatHistory(userKey) {
   if (!userKey) return;
   try {
@@ -1275,126 +1426,8 @@ async function loadChatHistory(userKey) {
     const data = await res.json();
     if (!data.messages) return;
 
-    // Index all existing rows in DOM by:
-    // 1. data-msg-id (client assigned ID)
-    // 2. data-db-id (server DB integer ID)
-    // 3. Content signature: sender|time|snippet
-    const existingMsgRows = document.querySelectorAll('#chatMessages .message-row');
-    const existingIdMap = new Map();
-    const existingSigMap = new Map();
-
-    existingMsgRows.forEach(row => {
-      const mId = row.dataset.msgId;
-      const dbId = row.dataset.dbId;
-      if (mId) existingIdMap.set(String(mId), row);
-      if (dbId) existingIdMap.set(String(dbId), row);
-
-      const senderType = row.classList.contains('outgoing') ? 'outgoing' : 'incoming';
-      const timeEl = row.querySelector('.message-time');
-      const timeStr = timeEl ? timeEl.textContent.trim() : '';
-      const textEl = row.querySelector('.bubble-text-content') || row.querySelector('.bubble');
-      let textSnippet = '';
-      if (textEl) {
-        const clone = textEl.cloneNode(true);
-        clone.querySelectorAll('.seen-dot, .reply-quote-chip').forEach(el => el.remove());
-        textSnippet = clone.textContent.trim().substring(0, 40);
-      }
-      if (textSnippet || timeStr) {
-        const sig = `${senderType}|${timeStr}|${textSnippet}`;
-        existingSigMap.set(sig, row);
-      }
-    });
-
-    let appendedAny = false;
-    let hadIncoming = false;
-
-    for (const msg of data.messages) {
-      const dbIdStr = String(msg.id);
-      const clientMsgIdStr = msg.client_msg_id ? String(msg.client_msg_id) : null;
-      const isOutgoing = (msg.sender === activeUser);
-      const type = isOutgoing ? 'outgoing' : 'incoming';
-      const timeStr = msg.client_time || formatTimeFromIso(msg.created_at);
-      const isSeen = Boolean(msg.seen);
-
-      if (!isOutgoing) {
-        hadIncoming = true;
-      }
-
-      // Check if this message already exists in DOM
-      let matchingRow = null;
-      if (clientMsgIdStr && existingIdMap.has(clientMsgIdStr)) {
-        matchingRow = existingIdMap.get(clientMsgIdStr);
-      } else if (existingIdMap.has(dbIdStr)) {
-        matchingRow = existingIdMap.get(dbIdStr);
-      } else {
-        const textContent = msg.text_content || '';
-        const textSnippet = msg.msg_type === 'chat' ? textContent.trim().substring(0, 40) : '';
-        const sig = `${type}|${timeStr}|${textSnippet}`;
-        if (textSnippet && existingSigMap.has(sig)) {
-          matchingRow = existingSigMap.get(sig);
-        }
-      }
-
-      if (matchingRow) {
-        // Message already exists in DOM: cleanly sync DB id and seen status without re-appending!
-        matchingRow.dataset.dbId = dbIdStr;
-        if (clientMsgIdStr && !matchingRow.dataset.msgId) {
-          matchingRow.dataset.msgId = clientMsgIdStr;
-        }
-        if (isOutgoing) {
-          const badgeWrap = matchingRow.querySelector('.msg-status-badge');
-          if (badgeWrap) {
-            badgeWrap.outerHTML = getMessageStatusHtml(isSeen ? 'seen' : 'delivered');
-          }
-        }
-        continue;
-      }
-
-      let replyToData = msg.reply_to || null;
-      if (replyToData && typeof replyToData === 'string') {
-        try {
-          replyToData = JSON.parse(replyToData);
-        } catch (_) {}
-      }
-
-      const assignedMsgId = clientMsgIdStr || ('msg_' + dbIdStr);
-      const deliveryStatus = isSeen ? 'seen' : 'delivered';
-
-      if (msg.msg_type === 'chat') {
-        appendMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
-        appendedAny = true;
-      } else if (msg.msg_type === 'voice' && msg.text_content) {
-        appendVoiceMessage(msg.text_content, msg.media_duration || 1, type, timeStr, assignedMsgId, null, deliveryStatus, true, replyToData);
-        appendedAny = true;
-      } else if (msg.msg_type === 'image' && msg.text_content) {
-        appendImageMessage(msg.text_content, type, timeStr, assignedMsgId, deliveryStatus, true, replyToData);
-        appendedAny = true;
-      }
-
-      const newlyCreatedRow = document.querySelector(`#chatMessages .message-row[data-msg-id="${assignedMsgId}"]`);
-      if (newlyCreatedRow) {
-        newlyCreatedRow.dataset.dbId = dbIdStr;
-        existingIdMap.set(assignedMsgId, newlyCreatedRow);
-        existingIdMap.set(dbIdStr, newlyCreatedRow);
-      }
-    }
-
-    if (data.messages && data.messages.length > 0) {
-      const lastMsg = data.messages[data.messages.length - 1];
-      lastConversationMessage = {
-        text: lastMsg.text_content || '',
-        msg_type: lastMsg.msg_type || 'chat',
-        media_duration: lastMsg.media_duration,
-        time: lastMsg.client_time || formatTimeFromIso(lastMsg.created_at),
-        isOutgoing: (lastMsg.sender === activeUser),
-        isSeen: Boolean(lastMsg.seen)
-      };
-      updateChatsListCardUI();
-    }
-
-    if (appendedAny) {
-      scrollToBottom();
-    }
+    conversationMessagesCache.set(userKey, data.messages);
+    const renderRes = renderChatHistoryMessages(data.messages);
 
     // Sync opponent presence and last seen time from server payload
     if (data.is_opponent_online !== undefined) {
@@ -1406,7 +1439,7 @@ async function loadChatHistory(userKey) {
     }
 
     // Since the user is viewing chat history, mark all incoming messages seen if in conversation
-    if (hadIncoming && currentView === 'conversation') {
+    if (renderRes && renderRes.hadIncoming && currentView === 'conversation') {
       acknowledgeAllSeen(userKey);
     }
   } catch (err) {
@@ -3439,6 +3472,9 @@ function setupEventListeners() {
           body: JSON.stringify({ opponent: currentPartner.key })
         });
         if (res.ok) {
+          if (currentPartner && currentPartner.key) {
+            conversationMessagesCache.delete(currentPartner.key);
+          }
           clearChatDOM();
           showToast('Conversation cleared ✓', 'info');
         } else {
