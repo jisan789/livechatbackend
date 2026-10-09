@@ -932,26 +932,25 @@ button, input, textarea, select {
 
 .msg-status-badge .status-dot {
   display: block;
-  width: 6.5px;
-  height: 6.5px;
+  width: 4.5px;
+  height: 4.5px;
   border-radius: 50%;
-  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  box-shadow: none !important;
+  transition: background 0.18s ease;
 }
 
 /* For delivered a white small dot on current spaces */
 .msg-status-badge.status-delivered .status-dot,
 .msg-status-badge .status-dot.dot-delivered {
   background: #FFFFFF;
-  box-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
-  transform: scale(1);
+  box-shadow: none !important;
 }
 
 /* For seen, dots become orange that means seen */
 .msg-status-badge.status-seen .status-dot,
 .msg-status-badge .status-dot.dot-seen {
-  background: #FF9500; /* Vibrant warm orange */
-  box-shadow: 0 0 6px rgba(255, 149, 0, 0.95), 0 0 2px rgba(255, 149, 0, 1);
-  transform: scale(1.1);
+  background: #FF9500; /* Crisp warm orange without glow */
+  box-shadow: none !important;
 }
 
 .message-row.incoming .msg-status-badge {
@@ -1049,7 +1048,7 @@ button, input, textarea, select {
 .bubble.image-bubble .msg-status-badge {
   bottom: 8px;
   right: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  box-shadow: none;
 }
 
 /* ══════════════════════════════════════════════════
