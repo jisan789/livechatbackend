@@ -1544,6 +1544,15 @@ button, input, textarea, select {
   transform: scale(0.92);
 }
 
+.emoji-btn.is-cooldown,
+.action-icon-btn.is-cooldown {
+  opacity: 0.5;
+  filter: grayscale(0.2);
+  cursor: not-allowed;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
 .emoji-btn img.emoji {
   width: 26px;
   height: 26px;

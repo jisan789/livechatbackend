@@ -1657,7 +1657,10 @@ function handleWsMessage(msg) {
 
     // ── Flying Balloon Emoji Reaction ─────────────
     case 'flying_emoji':
-      createFlyingBalloon(msg.emoji);
+      if (Date.now() - lastIncomingEmojiTime >= 2000) {
+        lastIncomingEmojiTime = Date.now();
+        createFlyingBalloon(msg.emoji);
+      }
       break;
 
     // ── Seen status ───────────────────────────────
@@ -3249,10 +3252,12 @@ function setupEventListeners() {
       e.preventDefault();
       markMessageInteraction();
       const randomEmoji = ROMANTIC_BURST_EMOJIS[Math.floor(Math.random() * ROMANTIC_BURST_EMOJIS.length)];
-      sendFlyingEmojiBalloon(randomEmoji);
-      loveBlastBtn.style.transform = 'scale(1.2) rotate(-12deg)';
-      setTimeout(() => { loveBlastBtn.style.transform = ''; }, 250);
-      showToast('Love sent ❤️‍🔥', 'success');
+      const sent = sendFlyingEmojiBalloon(randomEmoji);
+      if (sent) {
+        loveBlastBtn.style.transform = 'scale(1.2) rotate(-12deg)';
+        setTimeout(() => { loveBlastBtn.style.transform = ''; }, 250);
+        showToast('Love sent ❤️‍🔥', 'success');
+      }
       keepInputFocused();
     });
   }
@@ -3562,7 +3567,7 @@ function setupEventListeners() {
       if (chatInput) chatInput.focus({ preventScroll: true });
     }, { passive: true });
 
-    let lastEmojiSendTime = 0;
+    let lastSingleEmojiTapTime = 0;
     document.querySelectorAll('.emoji-btn').forEach(btn => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -3578,6 +3583,10 @@ function setupEventListeners() {
           e.preventDefault();
           e.stopPropagation();
         }
+        const now = Date.now();
+        if (now - lastSingleEmojiTapTime < 400) return;
+        lastSingleEmojiTapTime = now;
+
         const emojiChar = btn.dataset.emoji || btn.getAttribute('data-emoji') || (btn.querySelector('img.emoji')?.alt) || btn.textContent.trim();
         if (emojiChar) {
           sendFlyingEmojiBalloon(emojiChar);
@@ -3965,6 +3974,19 @@ function formatDuration(sec) {
 //  Floating Balloon Emoji Reactions
 // ─────────────────────────────────────────────────
 let lastEmojiTapTime = 0;
+let lastIncomingEmojiTime = 0;
+const EMOJI_COOLDOWN_MS = 3000;
+
+function applyEmojiCooldownUI(durationMs) {
+  const emojiButtons = document.querySelectorAll('.emoji-btn');
+  emojiButtons.forEach(btn => btn.classList.add('is-cooldown'));
+  if (loveBlastBtn) loveBlastBtn.classList.add('is-cooldown');
+
+  setTimeout(() => {
+    emojiButtons.forEach(btn => btn.classList.remove('is-cooldown'));
+    if (loveBlastBtn) loveBlastBtn.classList.remove('is-cooldown');
+  }, durationMs);
+}
 
 function getBalloonsContainer() {
   let container = document.getElementById('floatingBalloonsContainer');
@@ -4085,16 +4107,24 @@ function createFlyingBalloon(emojiChar) {
   if (!emojiChar) return;
   const container = getBalloonsContainer();
 
+  // Guard against mass spam: cap max active balloons in DOM to prevent lag/crashing
+  if (container.children.length >= 24) {
+    return;
+  }
+
   const companions = COMPANION_EMOJIS[emojiChar] || ['✨', '💖', '❤️‍🔥', '💕', '💋'];
 
-  // Release a lavish flock: 10-12 emojis with staggered fountain timing
-  const count = 10 + Math.floor(Math.random() * 3); // 10 to 12 emojis
+  // Balanced flock: 6-8 emojis with staggered fountain timing for high framerate
+  const count = 6 + Math.floor(Math.random() * 3); // 6 to 8 emojis
   const baseLeft = 18 + Math.random() * 64; // central launch area (18% - 82%)
 
   for (let i = 0; i < count; i++) {
-    const staggerDelay = i * (35 + Math.floor(Math.random() * 25)); // 35-60ms stagger
+    const staggerDelay = i * (40 + Math.floor(Math.random() * 20)); // 40-60ms stagger
 
     setTimeout(() => {
+      // Re-check so late staggered items don't overflow DOM
+      if (container.children.length >= 28) return;
+
       const balloon = document.createElement('div');
 
       // Random trajectory variant
@@ -4102,7 +4132,7 @@ function createFlyingBalloon(emojiChar) {
       balloon.className = `flying-balloon ${trajectoryStyle}`;
 
       const isLead = (i === 0 || i === 1);
-      const isMini = (i >= count - 3);
+      const isMini = (i >= count - 2);
 
       // Emoji selection: lead is always the chosen emoji, others mix companions & sparkles
       let chosenChar = emojiChar;
@@ -4113,18 +4143,18 @@ function createFlyingBalloon(emojiChar) {
       // Sizing tier
       let size;
       if (isLead) {
-        size = 46 + Math.floor(Math.random() * 8); // 46-54px
+        size = 44 + Math.floor(Math.random() * 8); // 44-52px
       } else if (isMini) {
         size = 22 + Math.floor(Math.random() * 6); // 22-28px
       } else {
-        size = 32 + Math.floor(Math.random() * 10); // 32-42px
+        size = 32 + Math.floor(Math.random() * 8); // 32-40px
       }
 
       // Wide, organic natural spread across the view
       const spreadJitter = (Math.random() * 60 - 30) + (i % 2 === 0 ? 12 : -12);
       const leftPos = Math.max(6, Math.min(94, baseLeft + spreadJitter));
 
-      const duration = (2.9 + Math.random() * 0.9).toFixed(2);
+      const duration = (2.8 + Math.random() * 0.8).toFixed(2);
       const sway1 = (16 + Math.random() * 22) * (Math.random() > 0.5 ? 1 : -1);
       const sway2 = -sway1 * (0.8 + Math.random() * 0.4);
       const sway3 = (14 + Math.random() * 18) * (Math.random() > 0.5 ? 1 : -1);
@@ -4162,7 +4192,7 @@ function createFlyingBalloon(emojiChar) {
 
       setTimeout(() => {
         if (balloon.parentNode) balloon.remove();
-      }, (parseFloat(duration) + 0.8) * 1000);
+      }, (parseFloat(duration) + 0.6) * 1000);
 
       container.appendChild(balloon);
     }, staggerDelay);
@@ -4170,10 +4200,15 @@ function createFlyingBalloon(emojiChar) {
 }
 
 function sendFlyingEmojiBalloon(emojiChar) {
-  if (!emojiChar) return;
+  if (!emojiChar) return false;
   const now = Date.now();
-  if (now - lastEmojiTapTime < 40) return;
+  if (now - lastEmojiTapTime < EMOJI_COOLDOWN_MS) {
+    const remainingSeconds = Math.ceil((EMOJI_COOLDOWN_MS - (now - lastEmojiTapTime)) / 1000);
+    showToast(`Wait ${remainingSeconds}s before sending another emoji reaction ⏳`, 'info');
+    return false;
+  }
   lastEmojiTapTime = now;
+  applyEmojiCooldownUI(EMOJI_COOLDOWN_MS);
 
   // 1. Instantly trigger floating balloons on own chat inbox
   createFlyingBalloon(emojiChar);
@@ -4186,6 +4221,7 @@ function sendFlyingEmojiBalloon(emojiChar) {
 
   // 3. Keep virtual keyboard open and input focused
   keepInputFocused();
+  return true;
 }
 
 // ─────────────────────────────────────────────────
