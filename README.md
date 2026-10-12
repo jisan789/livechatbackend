@@ -6,6 +6,17 @@ All user interface assets have been removed; this codebase functions strictly as
 
 ---
 
+## 🌐 Live Production Base URL
+
+- **REST Base URL**: `https://livechatbackend-tm3r.onrender.com`
+- **WebSocket Gateway**: `wss://livechatbackend-tm3r.onrender.com/ws/{username}`
+- **Interactive Swagger UI**: [https://livechatbackend-tm3r.onrender.com/docs](https://livechatbackend-tm3r.onrender.com/docs)
+- **ReDoc Documentation**: [https://livechatbackend-tm3r.onrender.com/redoc](https://livechatbackend-tm3r.onrender.com/redoc)
+- **OpenAPI Schema**: [https://livechatbackend-tm3r.onrender.com/openapi.json](https://livechatbackend-tm3r.onrender.com/openapi.json)
+- **Health Check**: [https://livechatbackend-tm3r.onrender.com/health](https://livechatbackend-tm3r.onrender.com/health)
+
+---
+
 ## Features
 
 - **Pure Headless Backend**: No frontend/UI bloat; pure REST API + WebSocket gateway.
@@ -24,7 +35,14 @@ All user interface assets have been removed; this codebase functions strictly as
 
 ---
 
-## Quick Start
+## Documentation
+
+For the complete API reference, WebSocket event schemas, request/response models, and client code examples, see:
+- 📖 **[API Documentation](API_DOCUMENTATION.md)**
+
+---
+
+## Quick Start (Local Development)
 
 ### 1. Install Dependencies
 ```bash
@@ -40,26 +58,13 @@ Or with Uvicorn CLI:
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Server will be running at:
-- **API Root**: `http://localhost:8000/`
-- **Interactive Swagger Docs**: `http://localhost:8000/docs`
-- **ReDoc Documentation**: `http://localhost:8000/redoc`
-- **WebSocket Gateway**: `ws://localhost:8000/ws/{username}`
-
----
-
-## Documentation
-
-For the complete API reference, WebSocket event schemas, request/response models, and client code examples, see:
-- 📖 **[API Documentation](API_DOCUMENTATION.md)**
-
 ---
 
 ## Deployment (Render)
 
 1. Push this repository to GitHub.
-2. In Render, create a new **Web Service**.
-3. Render automatically picks up `render.yaml` or `Procfile`:
+2. In Render, create a new **Web Service** or use **Blueprint**:
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `python -m uvicorn server:app --host 0.0.0.0 --port $PORT`
-4. Set optional environment variable `PHP_STORAGE_URL` if pointing to a custom SQLite/PDO storage receiver.
+   - **Health Check Path**: `/health`
+3. Set optional environment variable `PHP_STORAGE_URL` if pointing to a custom SQLite/PDO storage receiver.
