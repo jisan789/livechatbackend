@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: livechat
+    name: livechatbackend
     runtime: python
     plan: free
-    pythonVersion: "3.11.9"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
-
+        value: 3.11.9
+      - key: PHP_STORAGE_URL
+        value: https://cdn.jisanfx.top/chatdatabase/reciever.php

@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, Body
 from fastapi.responses import JSONResponse
 from app.async_utils import run_in_thread
 from app.auth import (
@@ -17,22 +17,27 @@ from app.crud import (
     verify_user_passkey,
     get_user_profile,
 )
+from app.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    PasskeySetupRequest,
+    PasskeyVerifyRequest,
+)
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["Authentication & Security"])
 
 
-@router.post("/register")
-async def api_register(request: Request, response: Response):
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"status": "error", "message": "Invalid JSON"}, status_code=400)
-
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    display_name = data.get("display_name", "").strip()
-    avatar = data.get("avatar", "").strip()
-    passkey = data.get("passkey", "").strip()
+@router.post(
+    "/register",
+    summary="Register a new user account",
+    description="Creates a new user profile with optional display name, avatar, and 4-digit PIN passkey. Returns session token and sets session cookie.",
+)
+async def api_register(request: Request, response: Response, payload: RegisterRequest = Body(...)):
+    username = payload.username.strip().lower()
+    password = payload.password.strip()
+    display_name = payload.display_name.strip() if payload.display_name else None
+    avatar = payload.avatar.strip() if payload.avatar else None
+    passkey = payload.passkey.strip() if payload.passkey else None
 
     user, token, err = await run_in_thread(
         register_user,
@@ -40,7 +45,7 @@ async def api_register(request: Request, response: Response):
         password=password,
         display_name=display_name,
         avatar=avatar,
-        passkey=passkey if passkey else None,
+        passkey=passkey,
     )
 
     if err or not user:
@@ -58,15 +63,14 @@ async def api_register(request: Request, response: Response):
     }
 
 
-@router.post("/login")
-async def api_login(request: Request, response: Response):
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"status": "error", "message": "Invalid JSON"}, status_code=400)
-
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
+@router.post(
+    "/login",
+    summary="Authenticate user & obtain session token",
+    description="Validates username and password credentials. Sets HTTP-only session cookie and returns bearer token.",
+)
+async def api_login(request: Request, response: Response, payload: LoginRequest = Body(...)):
+    username = payload.username.strip().lower()
+    password = payload.password.strip()
 
     user, token, err = await run_in_thread(authenticate_user, username, password)
     if err or not user:
@@ -84,16 +88,24 @@ async def api_login(request: Request, response: Response):
     }
 
 
-@router.post("/logout")
+@router.post(
+    "/logout",
+    summary="Log out & invalidate session",
+    description="Revokes active session token on external database and clears browser session cookie.",
+)
 async def api_logout(request: Request, response: Response):
     token = extract_token_from_request(request)
     if token:
         await run_in_thread(delete_session, token)
     clear_session_cookie(response)
-    return {"status": "ok", "message": "Logged out"}
+    return {"status": "ok", "message": "Logged out successfully"}
 
 
-@router.get("/me")
+@router.get(
+    "/me",
+    summary="Get current authenticated user profile",
+    description="Validates current session cookie or Bearer token and returns user profile details.",
+)
 async def api_get_me(request: Request):
     token = extract_token_from_request(request)
     if not token:
@@ -106,23 +118,22 @@ async def api_get_me(request: Request):
     return {"status": "ok", "user": user}
 
 
-@router.post("/passkey/setup")
-async def api_set_passkey(request: Request):
+@router.post(
+    "/passkey/setup",
+    summary="Configure or change 4-digit PIN passkey",
+    description="Sets a 4-digit numeric passcode PIN for the user. Works via active session or explicit username parameter.",
+)
+async def api_set_passkey(request: Request, payload: PasskeySetupRequest = Body(...)):
     token = extract_token_from_request(request)
     user = await run_in_thread(verify_session_token, token) if token else None
 
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    username = (user["username"] if user else data.get("username", "")).strip().lower()
-    passkey = str(data.get("passkey", "")).strip()
+    username = (user["username"] if user else payload.username or "").strip().lower()
+    passkey = payload.passkey.strip()
 
     if not username:
-        return JSONResponse({"status": "error", "message": "Not authenticated"}, status_code=401)
+        return JSONResponse({"status": "error", "message": "Not authenticated. Provide username or log in."}, status_code=401)
     if len(passkey) != 4 or not passkey.isdigit():
-        return JSONResponse({"status": "error", "message": "Passkey must be a 4-digit number"}, status_code=400)
+        return JSONResponse({"status": "error", "message": "Passkey must be exactly 4 digits (0-9)"}, status_code=400)
 
     ok = await run_in_thread(set_user_passkey, username, passkey)
     if ok:
@@ -130,15 +141,14 @@ async def api_set_passkey(request: Request):
     return JSONResponse({"status": "error", "message": "Could not set passkey"}, status_code=500)
 
 
-@router.post("/passkey/verify")
-async def api_verify_passkey(request: Request):
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    username = data.get("username", "").strip().lower()
-    passkey = str(data.get("passkey", "")).strip()
+@router.post(
+    "/passkey/verify",
+    summary="Verify user 4-digit PIN passkey",
+    description="Checks if the submitted 4-digit passkey matches the stored passkey for the specified username.",
+)
+async def api_verify_passkey(request: Request, payload: PasskeyVerifyRequest = Body(...)):
+    username = payload.username.strip().lower()
+    passkey = payload.passkey.strip()
 
     if not username or not passkey:
         return JSONResponse({"status": "error", "message": "Missing username or passkey"}, status_code=400)

@@ -1,24 +1,65 @@
-# LiveChat — Real-Time Chat
+# LiveChat — Backend Server & Real-Time Gateway
 
-A private, real-time 2-user messaging web application built with FastAPI and WebSockets.
+A pure, high-performance real-time backend API server built with **FastAPI** and **WebSockets**. Optimized for zero-disk and containerized cloud environments (Render, Railway, Fly.io, AWS, Docker).
 
-## Local Development
+All user interface assets have been removed; this codebase functions strictly as a headless backend API and real-time WebSocket messaging gateway.
 
+---
+
+## Features
+
+- **Pure Headless Backend**: No frontend/UI bloat; pure REST API + WebSocket gateway.
+- **Interactive Documentation**: Built-in Swagger UI at `/docs` and ReDoc at `/redoc`.
+- **Live Keystroke & Typing Streaming**:
+  - `live_typing`: Character/word draft synchronization in real-time.
+  - `typing_keystroke`: Sub-millisecond keystroke-by-keystroke audio/input streaming.
+  - `typing_start` / `typing_stop`: Standard typing status indicators.
+- **Full Settings Management via REST & WebSocket**:
+  - Update user display name and avatar (`update_profile`).
+  - Configure and verify 4-digit PIN passkeys (`set_passkey`, `verify_passkey`).
+  - Safely clear conversation history between participants (`clear_chat`).
+  - Query user directory and message history over WebSocket or REST.
+- **Multi-Media Messaging**: Text chat, voice recordings, and images with automatic external persistence and instant delivery ACKs (`msg_ack`).
+- **Presence & Read Receipts**: Real-time online/offline broadcasting, heartbeat pings, and read receipts (`seen`).
+
+---
+
+## Quick Start
+
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
-python server.py
 ```
 
-Open `http://localhost:8000` in your browser.
+### 2. Start Backend Server
+```bash
+python server.py
+```
+Or with Uvicorn CLI:
+```bash
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+```
 
-## Deploy on Render
+Server will be running at:
+- **API Root**: `http://localhost:8000/`
+- **Interactive Swagger Docs**: `http://localhost:8000/docs`
+- **ReDoc Documentation**: `http://localhost:8000/redoc`
+- **WebSocket Gateway**: `ws://localhost:8000/ws/{username}`
 
-1. Push this repo to GitHub
-2. Create a new **Web Service** on [Render](https://render.com)
-3. Connect your GitHub repo
-4. Render auto-detects `render.yaml` — click **Deploy**
+---
 
-## Tech Stack
-- **Backend**: Python + FastAPI + WebSockets
-- **Frontend**: Vanilla HTML/CSS/JS
-- **Deploy**: Render (free tier)
+## Documentation
+
+For the complete API reference, WebSocket event schemas, request/response models, and client code examples, see:
+- 📖 **[API Documentation](API_DOCUMENTATION.md)**
+
+---
+
+## Deployment (Render)
+
+1. Push this repository to GitHub.
+2. In Render, create a new **Web Service**.
+3. Render automatically picks up `render.yaml` or `Procfile`:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `python -m uvicorn server:app --host 0.0.0.0 --port $PORT`
+4. Set optional environment variable `PHP_STORAGE_URL` if pointing to a custom SQLite/PDO storage receiver.
